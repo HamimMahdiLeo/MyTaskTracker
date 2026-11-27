@@ -1,0 +1,3480 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="QA Tracker">
+  <title>QA Office Task Tracker — Stopwatch, Task Log & Payment Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            bgmain: '#090d16',
+            bgcard: '#111827',
+            bghover: '#1e293b',
+            borderdark: '#1f2937',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #090d16;
+      color: #f1f5f9;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    @keyframes pulse-border {
+      0%, 100% { border-color: rgba(234, 179, 8, 0.85); box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.25); }
+      50% { border-color: rgba(234, 179, 8, 0.3); box-shadow: 0 0 0 0px rgba(234, 179, 8, 0); }
+    }
+    .running-card {
+      animation: pulse-border 2s infinite ease-in-out;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-sky-500 selection:text-white pb-20 md:pb-6">
+
+  <!-- ==================== LOGIN OVERLAY (USERNAME ONLY) ==================== -->
+  <div id="loginOverlay" class="fixed inset-0 z-[100] bg-[#090d16] flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-5">
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 mx-auto rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-bold text-sky-400 text-lg shadow-inner">
+          QA
+        </div>
+        <h2 class="text-lg font-bold text-slate-100 tracking-tight">Office Task & Timer Tracker</h2>
+        <p class="text-xs text-slate-400">Enter your username to access your workspace.</p>
+      </div>
+
+      <form onsubmit="app.handleLoginSubmit(event)" class="space-y-4">
+        <div>
+          <label for="loginUsernameInput" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">Username</label>
+          <input type="text" id="loginUsernameInput" autocomplete="username" required placeholder="Enter username..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-3 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+        </div>
+
+        <p id="loginErrorMsg" class="hidden text-xs font-semibold text-rose-400 bg-rose-950/60 border border-rose-800 rounded-lg px-3 py-2 text-center"></p>
+
+        <button type="submit" class="w-full py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-bold text-sm tracking-wide shadow-lg transition">
+          UNLOCK WORKSPACE
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOP HEADER & DESKTOP NAVIGATION -->
+  <header class="sticky top-0 z-30 bg-[#090d16]/95 backdrop-blur-md border-b border-slate-800/90">
+    <div class="max-w-[1600px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
+      <!-- Brand + Active Running Pill -->
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-mono font-bold text-sky-400 text-sm shrink-0 shadow-inner">
+          QA
+        </div>
+        <div class="truncate">
+          <h1 class="font-bold text-sm sm:text-base tracking-tight text-slate-100 truncate">Office Task & Timer Tracker</h1>
+        </div>
+      </div>
+
+      <!-- Global Active Timer Banner (if any task is running) -->
+      <div id="globalActiveTimerBanner" class="hidden items-center gap-2 bg-amber-500/10 border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs cursor-pointer hover:bg-amber-500/20 transition" onclick="app.jumpToRunningTask()">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+        <span id="globalActiveTimerPC" class="font-mono font-bold text-amber-300">ACTIVE</span>
+        <span id="globalActiveTimerGame" class="text-slate-300 hidden sm:inline truncate max-w-[120px]">Timer</span>
+        <span id="globalActiveTimerClock" class="font-mono font-semibold text-amber-400 tabular-nums">00:00:00</span>
+      </div>
+
+      <!-- Desktop Navigation Tabs -->
+      <nav class="hidden md:flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
+        <button onclick="app.switchView('today')" data-nav="today" class="nav-btn px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5">
+          <span>⏱</span> TODAY
+        </button>
+        <button onclick="app.switchView('history')" data-nav="history" class="nav-btn px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5">
+          <span>🔎</span> HISTORY
+        </button>
+        <button onclick="app.switchView('summary')" data-nav="summary" class="nav-btn px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5">
+          <span>📊</span> SUMMARY
+        </button>
+        <button onclick="app.switchView('settings')" data-nav="settings" class="nav-btn px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5">
+          <span>⚙️</span> SETTINGS
+        </button>
+      </nav>
+
+      <!-- User Pill, Cloud Sync Status & Logout -->
+      <div id="headerUserControls" class="hidden items-center gap-2 shrink-0">
+        <button id="cloudSyncStatusBtn" onclick="app.manualCloudSync()" class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono font-semibold text-slate-400 transition flex items-center gap-1.5" title="Click to sync with cloud now">
+          <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span id="cloudSyncText">Local Only</span>
+        </button>
+        <span id="headerUsernameBadge" class="hidden lg:inline-block text-xs font-mono font-semibold text-sky-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg">SkillNotFoundUwU</span>
+        <button onclick="app.logout()" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-rose-300 border border-slate-800 text-xs font-semibold transition" title="Log Out">
+          🚪 <span class="hidden sm:inline">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-[1300px] w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5">
+
+    <!-- ==================== VIEW 1: TODAY (TIMER + TODAY'S TASK LOG) ==================== -->
+    <section id="view-today" class="space-y-4">
+      
+      <!-- Date & Week Navigation Panel -->
+      <div id="daySwipeArea" class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 sm:p-4 shadow-lg">
+        <!-- Top Row: Week Range + Day Controls -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+          
+          <!-- Day Stepper & Current Date -->
+          <div class="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+            <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+              <button onclick="app.changeDay(-1)" class="px-3 py-1.5 hover:bg-slate-800 active:bg-slate-700 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition flex items-center gap-1" title="Previous Day">
+                ‹ <span class="hidden sm:inline">Prev Day</span>
+              </button>
+              <button onclick="app.goToToday()" id="btnTodayJump" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-bold tracking-wide transition mx-0.5">
+                TODAY
+              </button>
+              <button onclick="app.changeDay(1)" class="px-3 py-1.5 hover:bg-slate-800 active:bg-slate-700 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition flex items-center gap-1" title="Next Day">
+                <span class="hidden sm:inline">Next Day</span> ›
+              </button>
+            </div>
+
+            <div class="text-right sm:text-left">
+              <div class="flex items-center justify-end sm:justify-start gap-2">
+                <span id="displayDayName" class="text-xs sm:text-sm font-bold tracking-wider uppercase text-sky-400">SATURDAY</span>
+                <span id="displayIsTodayTag" class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">TODAY</span>
+              </div>
+              <div id="displayFullDate" class="text-sm sm:text-lg font-extrabold tracking-tight text-slate-100">31 OCTOBER 2026</div>
+            </div>
+          </div>
+
+          <!-- Week Strip Controls -->
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs">
+              <button onclick="app.changeWeek(-1)" class="px-2 py-1 text-slate-400 hover:text-white font-bold">‹</button>
+              <span id="displayWeekRange" class="font-mono font-semibold text-slate-300 px-2">WEEK OF OCT 26 – NOV 01</span>
+              <button onclick="app.changeWeek(1)" class="px-2 py-1 text-slate-400 hover:text-white font-bold">›</button>
+            </div>
+            <input type="date" id="datePickerInput" onchange="app.onDatePickerChange(this.value)" class="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-lg px-2.5 py-1.5 font-mono focus:outline-none focus:border-sky-500">
+          </div>
+        </div>
+
+        <!-- 7-Day Week Pills (MON - SUN) -->
+        <div id="weekDaysStrip" class="grid grid-cols-7 gap-1 sm:gap-2 pt-3">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- CENTRAL ACTION: START TASK -> TIMER STARTS -> STOP -> ENTER PC, GAME, SESSION ID, TASK ID -->
+      <div id="primaryTimerHeroContainer" class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Daily Summary Metrics Bar -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:p-3">
+          <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Tasks Logged</div>
+          <div id="metricTasksCount" class="text-base sm:text-xl font-mono font-bold text-slate-100 mt-0.5">0</div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:p-3">
+          <div class="text-[11px] font-medium text-sky-400/90 uppercase tracking-wider">⏱ Work Time</div>
+          <div id="metricWorkTime" class="text-base sm:text-xl font-mono font-bold text-sky-400 mt-0.5 tabular-nums">0h 00m</div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:p-3">
+          <div class="text-[11px] font-medium text-emerald-400/90 uppercase tracking-wider">🟢 Completed</div>
+          <div id="metricCompleted" class="text-base sm:text-xl font-mono font-bold text-emerald-400 mt-0.5">0</div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:p-3">
+          <div class="text-[11px] font-medium text-amber-400/90 uppercase tracking-wider">🟡 In Prog / 🔴 Blk</div>
+          <div id="metricInProgBlocked" class="text-base sm:text-xl font-mono font-bold text-amber-400 mt-0.5">0 / 0</div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:p-3">
+          <div class="text-[11px] font-medium text-emerald-300 uppercase tracking-wider">✅ Payment Done</div>
+          <div id="metricPaidCount" class="text-base sm:text-xl font-mono font-bold text-emerald-300 mt-0.5">0 <span class="text-xs font-normal text-slate-500">/ 0</span></div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 sm:p-3">
+          <div class="text-[11px] font-medium text-emerald-300 uppercase tracking-wider">৳ Day Payment</div>
+          <div id="metricPayment" class="text-base sm:text-xl font-mono font-bold text-emerald-300 mt-0.5 tabular-nums">৳0</div>
+        </div>
+      </div>
+
+      <!-- OFFICE ATTENDANCE (LOGIN / LOGOUT TRACKER) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:px-5 shadow-lg space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🏢</span>
+            <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-200">Office Attendance (Join / Leave)</h3>
+            <span id="attendanceStatusPill" class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">NO LOG</span>
+          </div>
+          <div class="flex items-center gap-4 text-xs font-mono flex-wrap">
+            <div><span class="text-slate-500">Joined:</span> <span id="attFirstJoin" class="font-bold text-emerald-400">—</span></div>
+            <div><span class="text-slate-500">Left:</span> <span id="attLastLeave" class="font-bold text-rose-300">—</span></div>
+            <div><span class="text-slate-500">Office Time:</span> <span id="attTotalDuration" class="font-bold text-sky-400 tabular-nums">0h 00m</span></div>
+            <button type="button" onclick="app.exportAttendanceCSV()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[11px] font-semibold transition" title="Export Login/Logout Attendance CSV">
+              ⬇ CSV
+            </button>
+          </div>
+        </div>
+        <div id="attendanceSessionsList" class="flex flex-wrap gap-2">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- TODAY'S LOGGED TASKS LIST (Replaces 40-PC Grid) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div class="p-3.5 sm:px-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5">
+            <h3 class="text-sm sm:text-base font-bold text-slate-100">Tasks Logged on <span id="todayListDateLabel" class="text-sky-400 font-mono"></span></h3>
+            <span id="todayTasksBadge" class="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">0</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Filter Pills -->
+            <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 overflow-x-auto">
+              <button onclick="app.setDayListFilter('ALL')" data-dfilter="ALL" class="day-filter-btn px-2.5 py-1 rounded text-[11px] font-semibold transition">ALL</button>
+              <button onclick="app.setDayListFilter('UNPAID')" data-dfilter="UNPAID" class="day-filter-btn px-2.5 py-1 rounded text-[11px] font-semibold transition">⏳ UNPAID</button>
+              <button onclick="app.setDayListFilter('PAID')" data-dfilter="PAID" class="day-filter-btn px-2.5 py-1 rounded text-[11px] font-semibold transition">✅ PAID</button>
+              <button onclick="app.setDayListFilter('COMPLETED')" data-dfilter="COMPLETED" class="day-filter-btn px-2.5 py-1 rounded text-[11px] font-semibold transition">🟢 DONE</button>
+            </div>
+
+            <button onclick="app.openManualAddTaskModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1">
+              <span>＋</span> Manual Entry
+            </button>
+          </div>
+        </div>
+
+        <!-- Tasks List Container -->
+        <div id="todayTasksListContainer" class="divide-y divide-slate-800/80">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 2: HISTORY ==================== -->
+    <section id="view-history" class="hidden space-y-4">
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-100">Task History & Payment Checklist</h2>
+            <p class="text-xs text-slate-400">Stored by PC Number, Game Name, Session ID, Task ID, Duration, and one-tap Payment Done status.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span id="historyResultCount" class="text-xs font-mono bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">0 Tasks</span>
+            <button onclick="app.exportCSV()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition">
+              ⬇ Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5 pt-1">
+          <div class="sm:col-span-2 md:col-span-5 relative">
+            <input type="text" id="historySearchInput" oninput="app.renderHistory()" placeholder="Search PC, Session ID, Task ID, Game Name, Notes..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500">
+            <button onclick="document.getElementById('historySearchInput').value=''; app.renderHistory();" class="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-xs">✕</button>
+          </div>
+
+          <!-- Payment Status Filter -->
+          <div class="md:col-span-2">
+            <select id="historyPaymentFilter" onchange="app.renderHistory()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="ALL">Payment: ALL</option>
+              <option value="UNPAID">⏳ UNPAID / PENDING</option>
+              <option value="PAID">✅ PAYMENT DONE</option>
+            </select>
+          </div>
+
+          <!-- Task Status Filter -->
+          <div class="md:col-span-2">
+            <select id="historyStatusFilter" onchange="app.renderHistory()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="ALL">Status: ALL</option>
+              <option value="COMPLETED">🟢 COMPLETED</option>
+              <option value="IN_PROGRESS">🟡 IN PROGRESS</option>
+              <option value="BLOCKED">🔴 BLOCKED</option>
+            </select>
+          </div>
+
+          <!-- Timeframe Filter -->
+          <div class="md:col-span-3">
+            <select id="historyTimeFilter" onchange="app.renderHistory()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-sky-500">
+              <option value="ALL">Timeframe: ALL TIME</option>
+              <option value="TODAY">TODAY ONLY</option>
+              <option value="THIS_WEEK">THIS SELECTED WEEK</option>
+              <option value="PREVIOUS_WEEKS">PREVIOUS WEEKS</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Structured Table / List -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        <!-- Desktop Table Header -->
+        <div class="hidden md:grid md:grid-cols-12 gap-3 px-4 py-2.5 bg-slate-950 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <div class="col-span-2">Date & PC</div>
+          <div class="col-span-2">Game Name</div>
+          <div class="col-span-3">Session ID & Task ID</div>
+          <div class="col-span-2">Duration & Status</div>
+          <div class="col-span-3 text-right">Payment Done? (Check Later)</div>
+        </div>
+        <div id="historyListContainer" class="divide-y divide-slate-800/80">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 3: WEEKLY SUMMARY ==================== -->
+    <section id="view-summary" class="hidden space-y-4">
+      <!-- Week Selector Header -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100">Weekly Work & Payment Summary</h2>
+          <p class="text-xs text-slate-400">Complete breakdown of tasks, testing duration, and Paid vs Unpaid BDT (৳) totals for the week.</p>
+        </div>
+        <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1 self-start sm:self-auto">
+          <button onclick="app.changeWeek(-1)" class="px-3 py-1.5 hover:bg-slate-800 rounded text-slate-300 text-xs font-bold">‹ Prev Week</button>
+          <span id="summaryWeekLabel" class="font-mono text-xs sm:text-sm font-bold text-sky-400 px-2">26 OCT – 01 NOV 2026</span>
+          <button onclick="app.changeWeek(1)" class="px-3 py-1.5 hover:bg-slate-800 rounded text-slate-300 text-xs font-bold">Next Week ›</button>
+        </div>
+      </div>
+
+      <!-- Weekly Grand Totals Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-2.5 sm:gap-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-xs text-slate-400 uppercase font-medium">Total Tasks</div>
+          <div id="sumTotalTasks" class="text-2xl font-mono font-bold text-white mt-1">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-xs text-sky-400 uppercase font-medium">Total Work Time</div>
+          <div id="sumTotalTime" class="text-2xl font-mono font-bold text-sky-400 mt-1">0h 00m</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-xs text-emerald-300 uppercase font-medium">Total Payment</div>
+          <div id="sumTotalPayment" class="text-2xl font-mono font-bold text-emerald-300 mt-1">৳0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-xs text-emerald-400 uppercase font-medium">✅ Payment Done</div>
+          <div id="sumPaidStatus" class="text-xl font-mono font-bold text-emerald-400 mt-1">0 / 0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-xs text-emerald-400 uppercase font-medium">🟢 Completed</div>
+          <div id="sumCompleted" class="text-xl font-mono font-bold text-emerald-400 mt-1">0</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5">
+          <div class="text-xs text-amber-400 uppercase font-medium">🟡 In Prog / 🔴 Blk</div>
+          <div id="sumInProgressBlocked" class="text-xl font-mono font-bold text-amber-400 mt-1">0 / 0</div>
+        </div>
+      </div>
+
+      <!-- Daily Breakdown Table / Cards (MON - SUN) -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Daily Breakdown (Monday – Sunday)</h3>
+          <span class="text-[11px] text-slate-500">Click any day to open its Task Log</span>
+        </div>
+        <div id="summaryDaysContainer" class="divide-y divide-slate-800/80">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 4: SETTINGS & BACKUP ==================== -->
+    <section id="view-settings" class="hidden space-y-6 pb-8">
+      
+      <!-- Account Session Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-100">Logged In Account</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Signed in as <span id="settingsUsernameLabel" class="font-mono font-bold text-sky-400">SkillNotFoundUwU</span> (username-only access).</p>
+        </div>
+        <button onclick="app.logout()" class="px-4 py-2.5 bg-slate-800 hover:bg-rose-950/70 text-slate-200 hover:text-rose-300 border border-slate-700 hover:border-rose-800/70 rounded-xl text-xs font-bold transition shrink-0">
+          🚪 Log Out
+        </button>
+      </div>
+
+      <!-- GitHub Gist Sync Card (No Firebase Needed) -->
+      <div class="bg-slate-900/90 border border-sky-500/30 rounded-xl p-4 sm:p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-sky-400">☁️ GitHub Gist Sync (Windows ↔ Android)</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Syncs all tasks & office attendance automatically using a private GitHub Gist under <b class="text-slate-200 font-mono">SkillNotFoundUwU</b>. Leave Gist ID blank on your first device to auto-create it.</p>
+          </div>
+          <span id="settingsSyncStateBadge" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 self-start sm:self-auto">Not Connected</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">GitHub Token (gist permission) *</label>
+            <input type="password" id="gistTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Gist ID (auto-created if blank)</label>
+            <input type="text" id="gistIdInput" placeholder="Leave blank on 1st device, paste on 2nd" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button onclick="app.saveGistConfig()" class="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs sm:text-sm transition">
+            💾 Connect & Sync
+          </button>
+          <button onclick="app.manualCloudSync()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs sm:text-sm border border-slate-700 transition">
+            🔄 Sync Now
+          </button>
+          <button onclick="app.disconnectGist()" class="px-4 py-2.5 bg-slate-950 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 font-semibold rounded-xl text-xs sm:text-sm border border-slate-800 transition">
+            Disconnect
+          </button>
+        </div>
+      </div>
+
+      <!-- Backup & Restore Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-100">Import Previous Data & Export Backups</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Import your existing JSON or CSV file once—if Cloud Sync is connected, it will automatically upload and sync to all devices.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <label class="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm shadow cursor-pointer transition">
+            <span>📤</span> Import JSON
+            <input type="file" id="importBackupInput" accept=".json" onchange="app.importJSONBackup(event)" class="hidden">
+          </label>
+
+          <label class="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-700/80 hover:bg-emerald-600 text-white font-semibold rounded-xl text-sm border border-emerald-500/40 cursor-pointer transition">
+            <span>📄</span> Import CSV
+            <input type="file" id="importCSVInput" accept=".csv" onchange="app.importCSVBackup(event)" class="hidden">
+          </label>
+
+          <button onclick="app.exportJSONBackup()" class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold rounded-xl text-sm border border-slate-700 transition">
+            <span>📥</span> Export JSON
+          </button>
+
+          <button onclick="app.exportCSV()" class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold rounded-xl text-sm border border-slate-700 transition">
+            <span>📊</span> Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Danger Zone / Data Management -->
+      <div class="bg-slate-900/90 border border-rose-900/50 rounded-xl p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 class="text-base font-bold text-rose-400">Danger Zone</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Deleted tasks are permanently removed from your device database and will never reappear after refreshing.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button onclick="app.confirmDeleteDay()" class="px-4 py-2.5 bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 border border-rose-800/70 rounded-xl text-xs font-semibold transition">
+            🗑 Clear Current Day (<span id="settingsCurrentDayLabel"></span>)
+          </button>
+          <button onclick="app.confirmDeleteAllTasks()" class="px-4 py-2.5 bg-rose-900/80 hover:bg-rose-800 text-white border border-rose-700 rounded-xl text-xs font-bold transition">
+            ⚠️ Wipe All Data
+          </button>
+        </div>
+      </div>
+
+      <!-- Standalone App Downloader -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-bold text-slate-200">Save Standalone HTML App</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Download a clean copy of this application to use offline on your PC or Android phone.</p>
+        </div>
+        <button onclick="app.downloadProjectFile('qa_office_task_pc_tracker.html')" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 rounded-xl text-xs font-bold transition shrink-0">
+          ⬇ Download Standalone HTML File
+        </button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#090d16]/95 backdrop-blur-md border-t border-slate-800 grid grid-cols-4 h-16">
+    <button onclick="app.switchView('today')" data-nav="today" class="nav-btn flex flex-col items-center justify-center gap-1 text-[11px] font-semibold">
+      <span class="text-base">⏱</span>
+      <span>TODAY</span>
+    </button>
+    <button onclick="app.switchView('history')" data-nav="history" class="nav-btn flex flex-col items-center justify-center gap-1 text-[11px] font-semibold">
+      <span class="text-base">🔎</span>
+      <span>HISTORY</span>
+    </button>
+    <button onclick="app.switchView('summary')" data-nav="summary" class="nav-btn flex flex-col items-center justify-center gap-1 text-[11px] font-semibold">
+      <span class="text-base">📊</span>
+      <span>SUMMARY</span>
+    </button>
+    <button onclick="app.switchView('settings')" data-nav="settings" class="nav-btn flex flex-col items-center justify-center gap-1 text-[11px] font-semibold">
+      <span class="text-base">⚙️</span>
+      <span>SETTINGS</span>
+    </button>
+  </nav>
+
+  <!-- ==================== MODAL 1: MANUAL / EDIT TASK MODAL ==================== -->
+  <div id="modalTaskForm" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in">
+      <div class="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="formModalPCBadge" class="px-2.5 py-1 rounded-md bg-sky-500/20 border border-sky-500/40 font-mono font-bold text-sky-400 text-sm">TASK</span>
+          <div>
+            <h3 id="formModalTitle" class="font-bold text-slate-100 text-base">Edit Task Details</h3>
+            <p id="formModalDateSub" class="text-[11px] text-slate-400 font-mono">2026-10-31</p>
+          </div>
+        </div>
+        <button onclick="app.closeTaskFormModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <form id="taskEntryForm" onsubmit="app.handleTaskFormSubmit(event)" class="p-5 space-y-4">
+        <input type="hidden" id="formTaskRecordId">
+        <input type="hidden" id="formMode" value="edit">
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">PC Number *</label>
+            <input type="text" id="formPCNumber" list="pcNumberPresets" required placeholder="e.g. 05" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-500">
+            <datalist id="pcNumberPresets"></datalist>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Game Name *</label>
+            <input type="text" id="formGameName" list="recentGamesList" required placeholder="e.g. Hauntvills, FC 27" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+            <datalist id="recentGamesList"></datalist>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Session ID *</label>
+            <input type="text" id="formTaskId" required placeholder="e.g. SESS-2381" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Task ID *</label>
+            <input type="text" id="formChunkId" required placeholder="e.g. TASK-04" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+          </div>
+        </div>
+
+        <!-- Section: Manual Work Time (Hours Count) -->
+        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold uppercase tracking-wider text-sky-400">
+              ⏱ Manual Work Time (Hours Count)
+            </label>
+            <span id="formWorkTimePreview" class="text-xs font-mono font-bold text-sky-400">0h 00m</span>
+          </div>
+          <div class="relative">
+            <input type="number" step="any" min="0" id="formWorkHours" oninput="app.updateManualTimePreview()" placeholder="Enter hours count e.g. 1, 1.5, 2.5" class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-16 py-2.5 text-sm font-mono font-bold text-sky-300 placeholder-slate-500 focus:outline-none focus:border-sky-500">
+            <span class="absolute right-3.5 top-2.5 text-xs font-mono text-slate-400 font-semibold pointer-events-none">HOURS</span>
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span class="text-[10px] text-slate-500 mr-0.5">Quick add:</span>
+            <button type="button" onclick="app.setManualWorkHours(0.5)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[11px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">0.5h (30m)</button>
+            <button type="button" onclick="app.setManualWorkHours(1)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[11px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">1h</button>
+            <button type="button" onclick="app.setManualWorkHours(1.5)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[11px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">1.5h</button>
+            <button type="button" onclick="app.setManualWorkHours(2)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[11px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">2h</button>
+            <button type="button" onclick="app.setManualWorkHours(3)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[11px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">3h</button>
+            <button type="button" onclick="app.setManualWorkHours(4)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[11px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">4h</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Payment Amount (৳)</label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-2.5 text-emerald-400 font-mono font-bold">৳</span>
+              <input type="number" step="any" min="0" id="formPayment" placeholder="Optional e.g. 150" class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+            </div>
+          </div>
+
+          <div id="formStatusWrapper">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Task Status</label>
+            <select id="formStatus" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-sky-500">
+              <option value="COMPLETED">🟢 COMPLETED</option>
+              <option value="IN_PROGRESS">🟡 IN PROGRESS</option>
+              <option value="BLOCKED">🔴 BLOCKED</option>
+              <option value="NOT_STARTED">⚪ NOT STARTED</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Payment Done Checkbox (Can be checked now or later) -->
+        <label class="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-emerald-500/40 transition">
+          <div>
+            <div class="text-xs font-bold text-slate-200">Payment Done?</div>
+            <div class="text-[11px] text-slate-400">Can be checked now or toggled later in History</div>
+          </div>
+          <input type="checkbox" id="formPaymentDone" class="w-5 h-5 accent-emerald-500 rounded cursor-pointer">
+        </label>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Optional Note</label>
+          <textarea id="formNotes" rows="2" placeholder="e.g. Character stayed in A-pose. Submitted footage." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"></textarea>
+        </div>
+
+        <div class="pt-2 flex items-center gap-2.5">
+          <button type="button" onclick="app.closeTaskFormModal()" class="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-wider transition">
+            Cancel
+          </button>
+          <button type="submit" id="formSubmitBtn" class="flex-1 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-bold text-sm tracking-wide shadow-lg transition flex items-center justify-center gap-2">
+            <span>💾</span> SAVE TASK
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 2: POST-STOP ENTER PC, GAME, SESSION ID, TASK ID, NOTE & PAYMENT ==================== -->
+  <div id="modalStopPrompt" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl my-auto">
+      <div class="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <span id="stopModalPC" class="text-[11px] font-mono font-bold text-amber-400 uppercase tracking-wider">⏹ TIMER STOPPED — ENTER TASK DETAILS</span>
+          <h3 id="stopModalHeaderTitle" class="text-base font-bold text-white mt-0.5">Save Stopped Work Session</h3>
+        </div>
+        <button type="button" onclick="app.resumeFromStopModal()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-mono font-semibold border border-slate-700 transition" title="Keep running timer">
+          ↩ Resume Timer
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+        <!-- Time Summary Box -->
+        <div class="grid grid-cols-3 gap-2 bg-slate-950 border border-slate-800 rounded-xl p-3 text-center">
+          <div>
+            <div class="text-[10px] uppercase text-slate-400">Started</div>
+            <div id="stopModalStart" class="text-xs sm:text-sm font-mono font-semibold text-slate-200 mt-0.5">4:37 PM</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-slate-400">Finished</div>
+            <div id="stopModalEnd" class="text-xs sm:text-sm font-mono font-semibold text-slate-200 mt-0.5">5:19 PM</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-sky-400">Work Time</div>
+            <div id="stopModalDuration" class="text-xs sm:text-sm font-mono font-bold text-sky-400 mt-0.5">42m 17s</div>
+          </div>
+        </div>
+
+        <!-- Step 1: Enter / Choose PC Number & Game Name -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div class="sm:col-span-5">
+            <label class="block text-xs font-bold uppercase tracking-wider text-sky-400 mb-1">1. PC Number *</label>
+            <div class="flex items-center gap-1.5">
+              <input type="text" id="stopModalPCInput" placeholder="e.g. 05" class="w-full bg-slate-950 border border-sky-500/60 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-sky-300 placeholder-slate-500 focus:outline-none focus:border-sky-400">
+              <select id="stopModalPCQuickSelect" onchange="if(this.value) document.getElementById('stopModalPCInput').value = this.value" class="bg-slate-950 border border-slate-700 rounded-xl px-2 py-2.5 text-xs font-mono text-slate-300 focus:outline-none" title="Quick pick PC 01–40">
+                <!-- Populated 01-40 -->
+              </select>
+            </div>
+            <div id="stopModalQuickPCPills" class="flex items-center gap-1 flex-wrap mt-1.5"></div>
+          </div>
+
+          <div class="sm:col-span-7">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">2. Game Name *</label>
+            <input type="text" id="stopModalGameInput" list="recentGamesList" placeholder="e.g. Hauntvills, FC 27, Huntsvills" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+            <div id="stopModalRecentGameChips" class="flex items-center gap-1.5 flex-wrap mt-1.5"></div>
+          </div>
+        </div>
+
+        <!-- Step 3: Session ID & Task ID -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">3. Session ID *</label>
+            <input type="text" id="stopModalTaskIdInput" placeholder="e.g. SESS-2381" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">4. Task ID *</label>
+            <input type="text" id="stopModalChunkIdInput" placeholder="e.g. TASK-04" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+          </div>
+        </div>
+
+        <!-- Step 4: Optional Note -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">5. Optional Note</label>
+          <input type="text" id="stopModalNotesInput" placeholder="e.g. Character stayed in A-pose, Submitted footage..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+        </div>
+
+        <!-- Step 5: Payment Option (Check now or later in History) -->
+        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" id="stopModalPaymentDone" class="w-5 h-5 accent-emerald-500 rounded cursor-pointer">
+              <div>
+                <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">Payment Done?</span>
+                <span class="block text-[11px] text-slate-400">Leave unchecked to mark Paid later from History/Today list</span>
+              </div>
+            </label>
+
+            <div class="w-32 sm:w-36 relative shrink-0">
+              <span class="absolute left-3 top-2 text-emerald-400 font-mono font-bold text-xs">৳</span>
+              <input type="number" step="any" min="0" id="stopModalPaymentInput" placeholder="Amount (opt)" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-sky-500">
+            </div>
+          </div>
+        </div>
+
+        <p id="stopModalValidationMsg" class="hidden text-xs font-semibold text-rose-400 bg-rose-950/60 border border-rose-800 rounded-lg px-3 py-2"></p>
+
+        <!-- Step 6: Save & Status Choice Buttons -->
+        <div class="space-y-2 pt-1">
+          <button type="button" onclick="app.finalizeStopStatus('COMPLETED')" class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition">
+            🟢 SAVE & MARK COMPLETED
+          </button>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="app.finalizeStopStatus('IN_PROGRESS')" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition">
+              🟡 IN PROGRESS
+            </button>
+            <button type="button" onclick="app.finalizeStopStatus('BLOCKED')" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition">
+              🔴 BLOCKED
+            </button>
+            <button type="button" onclick="app.discardStoppedTimer()" class="py-2.5 px-3 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 font-semibold text-xs flex items-center justify-center gap-1.5 transition">
+              🗑 DISCARD
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 3: TASK DETAILS VIEW ==================== -->
+  <div id="modalTaskDetails" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+      <div class="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="detailPCBadge" class="px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 font-mono font-bold text-sky-400 text-sm">PC 05</span>
+          <span id="detailDateBadge" class="text-xs font-mono text-slate-400">2026-10-31</span>
+        </div>
+        <button onclick="app.closeTaskDetailsModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-[11px] font-bold uppercase text-slate-400">Game</div>
+            <h3 id="detailGameName" class="text-xl font-bold text-white">Hauntvills</h3>
+          </div>
+          <div id="detailStatusBadge"></div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-slate-950 border border-slate-800 rounded-xl p-3.5">
+          <div>
+            <div class="text-[10px] uppercase text-slate-400">Session ID</div>
+            <div id="detailTaskId" class="text-sm font-mono font-bold text-slate-100 mt-0.5">SESS-2381</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-slate-400">Task ID</div>
+            <div id="detailChunkId" class="text-sm font-mono font-bold text-slate-100 mt-0.5">TASK-04</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-emerald-400">Payment</div>
+            <div id="detailPayment" class="text-sm font-mono font-bold text-emerald-400 mt-0.5">৳150</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-slate-400">Started</div>
+            <div id="detailStarted" class="text-xs font-mono text-slate-300 mt-0.5">4:37 PM</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-slate-400">Finished</div>
+            <div id="detailFinished" class="text-xs font-mono text-slate-300 mt-0.5">5:19 PM</div>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase text-sky-400">Work Time</div>
+            <div id="detailWorkTime" class="text-xs font-mono font-bold text-sky-400 mt-0.5">42m 17s</div>
+          </div>
+        </div>
+
+        <!-- One-Tap Payment Status Toggle Inside Details -->
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl p-3">
+          <div>
+            <div class="text-xs font-bold text-slate-200">Payment Status</div>
+            <div id="detailPaymentStatusSub" class="text-[11px] text-slate-400">Toggle whether payment is completed</div>
+          </div>
+          <button id="detailPaymentToggleBtn" onclick="app.togglePaymentFromDetails()" class="px-3.5 py-2 rounded-lg text-xs font-mono font-bold border transition">
+            ⏳ UNPAID
+          </button>
+        </div>
+
+        <!-- Quick Status Switcher -->
+        <div>
+          <div class="text-[11px] font-bold uppercase text-slate-400 mb-1.5">Quick Change Task Status</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <button onclick="app.quickChangeDetailStatus('NOT_STARTED')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700">⚪ Not Started</button>
+            <button onclick="app.quickChangeDetailStatus('IN_PROGRESS')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-amber-300 border border-slate-700">🟡 In Progress</button>
+            <button onclick="app.quickChangeDetailStatus('COMPLETED')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-emerald-300 border border-slate-700">🟢 Completed</button>
+            <button onclick="app.quickChangeDetailStatus('BLOCKED')" class="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-rose-300 border border-slate-700">🔴 Blocked</button>
+          </div>
+        </div>
+
+        <!-- Notes Box -->
+        <div>
+          <div class="text-[11px] font-bold uppercase text-slate-400 mb-1">Notes</div>
+          <div id="detailNotes" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 min-h-[48px] whitespace-pre-wrap">No notes recorded.</div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800">
+          <div class="flex items-center gap-2">
+            <button onclick="app.openEditFromDetails()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition">
+              ✏️ EDIT
+            </button>
+            <button id="detailRestartTimerBtn" onclick="app.restartTimerFromDetails()" class="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition">
+              ⏱ RESUME / START TIMER
+            </button>
+          </div>
+          <button onclick="app.deleteTaskFromDetails()" class="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/70 text-xs font-bold transition">
+            🗑 DELETE
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL 4: CUSTOM CONFIRMATION / CONFLICT DIALOG ==================== -->
+  <div id="modalConfirm" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-5 space-y-4">
+      <h3 id="confirmModalTitle" class="text-base font-bold text-white">Confirm Action</h3>
+      <p id="confirmModalMessage" class="text-xs sm:text-sm text-slate-300 leading-relaxed"></p>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="confirmCancelBtn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">Cancel</button>
+        <button id="confirmAcceptBtn" class="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastContainer" class="fixed bottom-20 md:bottom-6 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // GitHub Gist Sync keys are stored locally in your browser's Settings (never hardcoded in public GitHub repos).
+
+    /**
+     * ============================================================================
+     * 1. DUAL-COMPATIBLE INDEXEDDB STORAGE MODULE (OfficeTrackerDB + Legacy Migration)
+     * ============================================================================
+     * Uses `OfficeTrackerDB` -> `tasks` as the primary store, honors a persistent
+     * tombstone set (`qa_tracker_deleted_ids`) so deleted tasks NEVER come back
+     * on refresh, and deletes tasks across both primary & legacy stores.
+     */
+    class TrackerDatabase {
+      constructor() {
+        this.dbName = 'OfficeTrackerDB';
+        this.legacyDbName = 'office_qa_tracker_db';
+        this.dbVersion = 1;
+        this.storeName = 'tasks';
+        this.deletedKey = 'qa_tracker_deleted_ids_v2';
+        this.db = null;
+      }
+
+      getDeletedIdsSet() {
+        try {
+          const raw = localStorage.getItem(this.deletedKey);
+          const arr = raw ? JSON.parse(raw) : [];
+          return new Set(Array.isArray(arr) ? arr : []);
+        } catch (e) {
+          return new Set();
+        }
+      }
+
+      markIdsAsDeleted(ids) {
+        try {
+          const set = this.getDeletedIdsSet();
+          ids.forEach(id => {
+            if (id) set.add(String(id));
+          });
+          localStorage.setItem(this.deletedKey, JSON.stringify([...set]));
+        } catch (e) {}
+      }
+
+      unmarkIdAsDeleted(id) {
+        try {
+          const set = this.getDeletedIdsSet();
+          if (set.has(String(id))) {
+            set.delete(String(id));
+            localStorage.setItem(this.deletedKey, JSON.stringify([...set]));
+          }
+        } catch (e) {}
+      }
+
+      isSampleTask(task) {
+        if (!task || !task.id) return false;
+        if (String(task.id).includes('_SAMPLE_')) return true;
+        return false;
+      }
+
+      async init() {
+        this.db = await this.openDatabase(this.dbName);
+        await this.migrateFromLegacyDatabases();
+        return this.db;
+      }
+
+      openDatabase(name) {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(name, this.dbVersion);
+
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(this.storeName)) {
+              const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
+              store.createIndex('date', 'date', { unique: false });
+              store.createIndex('pcNumber', 'pcNumber', { unique: false });
+              store.createIndex('status', 'status', { unique: false });
+            }
+          };
+
+          request.onsuccess = (event) => resolve(event.target.result);
+          request.onerror = (event) => {
+            console.error(`IndexedDB error (${name}):`, event.target.error);
+            reject(event.target.error);
+          };
+        });
+      }
+
+      async migrateFromLegacyDatabases() {
+        const deletedSet = this.getDeletedIdsSet();
+
+        // Purge any already-deleted or auto-seeded sample tasks from primary DB first
+        try {
+          const currentTasks = await this.getAllTasksRaw();
+          const idsToPurge = currentTasks
+            .filter(t => t && deletedSet.has(String(t.id)))
+            .map(t => t.id);
+          if (idsToPurge.length > 0) {
+            await this.deleteMultipleFromDBInstance(this.db, idsToPurge);
+          }
+        } catch (e) {}
+
+        try {
+          // 1. Check legacy IndexedDB ('office_qa_tracker_db')
+          const legacyDB = await this.openDatabase(this.legacyDbName);
+          const legacyTasks = await new Promise((resolve) => {
+            if (!legacyDB.objectStoreNames.contains(this.storeName)) return resolve([]);
+            const tx = legacyDB.transaction([this.storeName], 'readonly');
+            const req = tx.objectStore(this.storeName).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+          });
+
+          if (legacyTasks.length > 0) {
+            const currentTasks = await this.getAllTasksRaw();
+            const currentMap = new Map(currentTasks.map(t => [t.id, t]));
+            const toMerge = [];
+            const legacyIdsToDelete = [];
+
+            for (const lt of legacyTasks) {
+              if (!lt || !lt.id) continue;
+              if (deletedSet.has(String(lt.id))) {
+                legacyIdsToDelete.push(lt.id);
+                continue;
+              }
+              const existing = currentMap.get(lt.id);
+              if (!existing || (Number(lt.updatedAt) || 0) > (Number(existing.updatedAt) || 0)) {
+                toMerge.push(lt);
+              }
+            }
+            if (legacyIdsToDelete.length > 0) {
+              await this.deleteMultipleFromDBInstance(legacyDB, legacyIdsToDelete);
+            }
+            if (toMerge.length > 0) {
+              await this.importBulkTasks(toMerge);
+            }
+          }
+          legacyDB.close();
+        } catch (e) {
+          console.warn('Legacy DB check skipped:', e);
+        }
+
+        // 2. Check any localStorage backup mirror if present (strictly respecting deletedSet)
+        try {
+          const rawMirror = localStorage.getItem('qa_tracker_tasks_mirror_v1');
+          if (rawMirror) {
+            const parsed = JSON.parse(rawMirror);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const currentTasks = await this.getAllTasksRaw();
+              const currentMap = new Map(currentTasks.map(t => [t.id, t]));
+              const toRestore = parsed.filter(
+                t => t && t.id && !deletedSet.has(String(t.id)) && !currentMap.has(t.id)
+              );
+              if (toRestore.length > 0) {
+                await this.importBulkTasks(toRestore);
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
+      deleteMultipleFromDBInstance(dbInstance, ids) {
+        return new Promise((resolve) => {
+          if (!dbInstance || !dbInstance.objectStoreNames.contains(this.storeName)) return resolve(false);
+          const tx = dbInstance.transaction([this.storeName], 'readwrite');
+          const store = tx.objectStore(this.storeName);
+          ids.forEach(id => store.delete(id));
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+        });
+      }
+
+      async saveTask(task, keepUpdatedAt = false) {
+        if (task && task.id) {
+          this.unmarkIdAsDeleted(task.id);
+        }
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([this.storeName], 'readwrite');
+          const store = tx.objectStore(this.storeName);
+          if (!keepUpdatedAt) {
+            task.updatedAt = Date.now();
+          }
+          store.put(task);
+          tx.oncomplete = () => resolve(task);
+          tx.onerror = (e) => reject(e.target.error);
+        });
+      }
+
+      async getTask(id) {
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([this.storeName], 'readonly');
+          const store = tx.objectStore(this.storeName);
+          const req = store.get(id);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = (e) => reject(e.target.error);
+        });
+      }
+
+      async deleteTask(id) {
+        return this.deleteMultipleTasks([id]);
+      }
+
+      async getAllTasksRaw() {
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([this.storeName], 'readonly');
+          const store = tx.objectStore(this.storeName);
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = (e) => reject(e.target.error);
+        });
+      }
+
+      async getAllTasks() {
+        const deletedSet = this.getDeletedIdsSet();
+        const raw = await this.getAllTasksRaw();
+        return raw.filter(t => t && t.id && !deletedSet.has(String(t.id)));
+      }
+
+      async deleteMultipleTasks(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return true;
+        // 1. Record permanent tombstones so deleted tasks NEVER resurrect
+        this.markIdsAsDeleted(ids);
+
+        // 2. Delete from primary OfficeTrackerDB
+        await this.deleteMultipleFromDBInstance(this.db, ids);
+
+        // 3. Also delete from legacy office_qa_tracker_db if it exists
+        try {
+          const legacyDB = await this.openDatabase(this.legacyDbName);
+          await this.deleteMultipleFromDBInstance(legacyDB, ids);
+          legacyDB.close();
+        } catch (e) {}
+
+        // 4. Update localStorage mirror immediately so refresh cannot restore them
+        try {
+          const remaining = await this.getAllTasks();
+          localStorage.setItem('qa_tracker_tasks_mirror_v1', JSON.stringify(remaining));
+        } catch (e) {}
+
+        return true;
+      }
+
+      async importBulkTasks(tasks, clearDeletedTombstone = false) {
+        const deletedSet = this.getDeletedIdsSet();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([this.storeName], 'readwrite');
+          const store = tx.objectStore(this.storeName);
+          tasks.forEach(task => {
+            if (task && task.id && task.date) {
+              if (clearDeletedTombstone) {
+                this.unmarkIdAsDeleted(task.id);
+                store.put(task);
+              } else if (!deletedSet.has(String(task.id))) {
+                store.put(task);
+              }
+            }
+          });
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = (e) => reject(e.target.error);
+        });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 2. ACCURATE TIMESTAMP STOPWATCH ENGINE (timer.js equivalent)
+     * ============================================================================
+     * Calculates elapsed time purely from Date.now() deltas and accumulatedDuration
+     * so browser sleep, phone lock screen, or tab switching never loses accuracy.
+     */
+    class StopwatchEngine {
+      static getElapsedMs(task) {
+        if (!task) return 0;
+        const base = Number(task.accumulatedDuration) || 0;
+        if (task.isRunning && !task.isPaused && task.lastResumeTimestamp) {
+          return base + Math.max(0, Date.now() - task.lastResumeTimestamp);
+        }
+        return base;
+      }
+
+      static formatHMS(ms) {
+        const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return [hours, minutes, seconds]
+          .map(v => String(v).padStart(2, '0'))
+          .join(':');
+      }
+
+      static formatHumanDuration(ms) {
+        const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+        if (totalSeconds === 0) return '0m 00s';
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (hours > 0) {
+          return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+        }
+        return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+      }
+
+      static formatSummaryHoursMinutes(ms) {
+        const totalMinutes = Math.floor(Math.max(0, ms) / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        return `${hours}h ${String(mins).padStart(2, '0')}m`;
+      }
+
+      static formatClockTime(timestamp) {
+        if (!timestamp) return '—';
+        const d = new Date(timestamp);
+        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * 3. MAIN APPLICATION CONTROLLER (app.js & ui.js equivalent)
+     * ============================================================================
+     */
+    class QATrackerApp {
+      constructor() {
+        this.db = new TrackerDatabase();
+        this.allTasks = []; // Cached in-memory mirror of IndexedDB for instant rendering
+        this.selectedDate = this.getTodayISO();
+        this.currentView = 'today';
+        this.dayListFilter = 'ALL';
+        this.activeDetailTaskId = null;
+        this.stoppingTaskId = null;
+        this.tickInterval = null;
+        this.initialized = false;
+        this.allowedUsername = 'SkillNotFoundUwU';
+        this.authStorageKey = 'qa_tracker_auth_user_v1';
+        this.gistTokenStorageKey = 'qa_tracker_gist_token_v1';
+        this.gistIdStorageKey = 'qa_tracker_gist_id_v1';
+        this.attendanceStorageKey = 'qa_tracker_attendance_v1';
+        this.activeAttendanceKey = 'qa_tracker_active_attendance_v1';
+        this.attendanceLogs = [];
+        this.cloudSyncInterval = null;
+        this.isSyncingCloud = false;
+      }
+
+      getTodayISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+
+      parseISODate(isoStr) {
+        if (!isoStr) return new Date();
+        const parts = String(isoStr).split('-');
+        if (parts.length === 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const d = parseInt(parts[2], 10);
+          return new Date(y, m, d, 12, 0, 0);
+        }
+        return new Date(isoStr);
+      }
+
+      getWeekDates(isoStr) {
+        const target = this.parseISODate(isoStr || this.selectedDate);
+        const day = target.getDay(); // 0 is Sunday, 1 is Monday...
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        const monday = new Date(target.getFullYear(), target.getMonth(), target.getDate() + diffToMonday, 12, 0, 0);
+
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i, 12, 0, 0);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dayNum = String(d.getDate()).padStart(2, '0');
+          dates.push(`${y}-${m}-${dayNum}`);
+        }
+        return dates;
+      }
+
+      changeDay(delta) {
+        const current = this.parseISODate(this.selectedDate);
+        current.setDate(current.getDate() + delta);
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        this.selectedDate = `${y}-${m}-${d}`;
+        this.renderAll();
+      }
+
+      goToToday() {
+        this.selectedDate = this.getTodayISO();
+        if (this.currentView !== 'today') {
+          this.switchView('today');
+        } else {
+          this.renderAll();
+        }
+      }
+
+      changeWeek(delta) {
+        const current = this.parseISODate(this.selectedDate);
+        current.setDate(current.getDate() + (delta * 7));
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        this.selectedDate = `${y}-${m}-${d}`;
+        this.renderAll();
+      }
+
+      switchView(viewName) {
+        this.currentView = viewName;
+        const views = ['today', 'history', 'summary', 'settings'];
+        views.forEach(v => {
+          const el = document.getElementById(`view-${v}`);
+          if (el) {
+            if (v === viewName) {
+              el.classList.remove('hidden');
+            } else {
+              el.classList.add('hidden');
+            }
+          }
+        });
+
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          const target = btn.getAttribute('data-nav');
+          const isActive = target === viewName;
+          if (btn.classList.contains('flex-col')) {
+            if (isActive) {
+              btn.classList.add('text-sky-400');
+              btn.classList.remove('text-slate-400');
+            } else {
+              btn.classList.remove('text-sky-400');
+              btn.classList.add('text-slate-400');
+            }
+          } else {
+            if (isActive) {
+              btn.classList.add('bg-sky-600', 'text-white', 'shadow-sm');
+              btn.classList.remove('text-slate-300', 'hover:text-white', 'hover:bg-slate-800');
+            } else {
+              btn.classList.remove('bg-sky-600', 'text-white', 'shadow-sm');
+              btn.classList.add('text-slate-300', 'hover:text-white', 'hover:bg-slate-800');
+            }
+          }
+        });
+
+        this.renderAll();
+      }
+
+      formatPCNumber(val) {
+        if (val === null || val === undefined) return '';
+        const str = String(val).trim();
+        if (!str) return '';
+        const clean = str.replace(/^pc\s*[-#]?\s*/i, '').trim();
+        const num = parseInt(clean, 10);
+        if (!isNaN(num) && num > 0) {
+          return String(num).padStart(2, '0');
+        }
+        return clean || str;
+      }
+
+      formatCurrency(amount) {
+        const num = Number(amount) || 0;
+        return `৳${num.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+      }
+
+      makeUniqueTaskId(dateStr = this.selectedDate) {
+        const cleanDate = (dateStr || this.getTodayISO()).replace(/-/g, '');
+        const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+        return `TASK_${cleanDate}_${Date.now()}_${rand}`;
+      }
+
+
+      // ---- Office Attendance (Login / Logout) Tracking ----
+      loadAttendanceLogs() {
+        try {
+          const deletedSet = this.db.getDeletedIdsSet();
+          const raw = localStorage.getItem(this.attendanceStorageKey);
+          const parsed = raw ? JSON.parse(raw) : [];
+          this.attendanceLogs = Array.isArray(parsed)
+            ? parsed.filter(a => a && a.id && !deletedSet.has(String(a.id)))
+            : [];
+        } catch (e) {
+          this.attendanceLogs = [];
+        }
+      }
+
+      saveAttendanceLogsLocal() {
+        try {
+          localStorage.setItem(this.attendanceStorageKey, JSON.stringify(this.attendanceLogs));
+        } catch (e) {}
+      }
+
+      recordOfficeLogin(username) {
+        const now = Date.now();
+        const today = this.getTodayISO();
+        const id = `ATT_${today.replace(/-/g, '')}_${now}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const entry = {
+          id,
+          date: today,
+          username: username || this.allowedUsername,
+          loginTime: now,
+          logoutTime: null,
+          updatedAt: now
+        };
+        this.attendanceLogs.push(entry);
+        this.saveAttendanceLogsLocal();
+        try {
+          localStorage.setItem(this.activeAttendanceKey, id);
+        } catch (e) {}
+        return entry;
+      }
+
+      recordOfficeLogout() {
+        const now = Date.now();
+        let activeId = null;
+        try {
+          activeId = localStorage.getItem(this.activeAttendanceKey);
+        } catch (e) {}
+
+        let session = activeId
+          ? this.attendanceLogs.find(a => a.id === activeId && !a.logoutTime)
+          : null;
+
+        if (!session) {
+          // Fallback: close the most recent open session
+          const openSessions = this.attendanceLogs
+            .filter(a => !a.logoutTime)
+            .sort((a, b) => (b.loginTime || 0) - (a.loginTime || 0));
+          session = openSessions[0] || null;
+        }
+
+        if (session) {
+          session.logoutTime = now;
+          session.updatedAt = now;
+          this.saveAttendanceLogsLocal();
+        }
+        try {
+          localStorage.removeItem(this.activeAttendanceKey);
+        } catch (e) {}
+        return session;
+      }
+
+      getAttendanceDurationMs(att) {
+        if (!att || !att.loginTime) return 0;
+        const end = att.logoutTime || Date.now();
+        return Math.max(0, end - att.loginTime);
+      }
+
+      getDayAttendanceSummary(isoDate) {
+        const logs = this.attendanceLogs
+          .filter(a => a.date === isoDate)
+          .sort((a, b) => (a.loginTime || 0) - (b.loginTime || 0));
+
+        if (logs.length === 0) {
+          return { logs: [], firstJoin: null, lastLeave: null, isInOffice: false, totalMs: 0 };
+        }
+        const firstJoin = logs[0].loginTime;
+        const isInOffice = logs.some(a => !a.logoutTime);
+        const completedLeaves = logs.map(a => a.logoutTime).filter(Boolean);
+        const lastLeave = completedLeaves.length > 0 ? Math.max(...completedLeaves) : null;
+        const totalMs = logs.reduce((acc, a) => acc + this.getAttendanceDurationMs(a), 0);
+        return { logs, firstJoin, lastLeave, isInOffice, totalMs };
+      }
+
+      renderDayAttendance() {
+        const summary = this.getDayAttendanceSummary(this.selectedDate);
+        const pill = document.getElementById('attendanceStatusPill');
+        const joinEl = document.getElementById('attFirstJoin');
+        const leaveEl = document.getElementById('attLastLeave');
+        const durEl = document.getElementById('attTotalDuration');
+        const listEl = document.getElementById('attendanceSessionsList');
+
+        if (!pill || !joinEl || !leaveEl || !durEl || !listEl) return;
+
+        if (summary.logs.length === 0) {
+          pill.textContent = 'NO LOG';
+          pill.className = 'text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+          joinEl.textContent = '—';
+          leaveEl.textContent = '—';
+          durEl.textContent = '0h 00m';
+          listEl.innerHTML = `<span class="text-xs text-slate-500">No login/logout recorded for ${this.selectedDate}. Logging in records join time; logging out records leave time.</span>`;
+          return;
+        }
+
+        if (summary.isInOffice) {
+          pill.textContent = '🟢 IN OFFICE';
+          pill.className = 'text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        } else {
+          pill.textContent = '🚪 LEFT OFFICE';
+          pill.className = 'text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30';
+        }
+
+        joinEl.textContent = StopwatchEngine.formatClockTime(summary.firstJoin);
+        leaveEl.textContent = summary.isInOffice
+          ? 'Active now'
+          : StopwatchEngine.formatClockTime(summary.lastLeave);
+        durEl.textContent = StopwatchEngine.formatSummaryHoursMinutes(summary.totalMs);
+
+        listEl.innerHTML = summary.logs.map((a, idx) => {
+          const inStr = StopwatchEngine.formatClockTime(a.loginTime);
+          const outStr = a.logoutTime ? StopwatchEngine.formatClockTime(a.logoutTime) : 'Active';
+          const durStr = StopwatchEngine.formatSummaryHoursMinutes(this.getAttendanceDurationMs(a));
+          return `
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-950 border ${a.logoutTime ? 'border-slate-800' : 'border-emerald-500/40'} text-[11px] font-mono">
+              <span class="text-slate-500">#${idx + 1}</span>
+              <span class="text-emerald-400">In: ${inStr}</span>
+              <span class="text-slate-600">→</span>
+              <span class="${a.logoutTime ? 'text-rose-300' : 'text-amber-300 font-bold'}">Out: ${outStr}</span>
+              <span class="text-sky-400">(${durStr})</span>
+              <button type="button" onclick="app.deleteAttendanceLog('${a.id}')" class="text-slate-500 hover:text-rose-400 ml-0.5" title="Remove this attendance entry">✕</button>
+            </div>
+          `;
+        }).join('');
+      }
+
+      deleteAttendanceLog(attId) {
+        const entry = this.attendanceLogs.find(a => a.id === attId);
+        if (!entry) return;
+        const inStr = StopwatchEngine.formatClockTime(entry.loginTime);
+        this.showConfirmModal(
+          'Delete Attendance Entry?',
+          `Remove login/logout log from ${entry.date} (Joined at ${inStr})?`,
+          'Delete',
+          async () => {
+            this.db.markIdsAsDeleted([attId]);
+            this.attendanceLogs = this.attendanceLogs.filter(a => a.id !== attId);
+            this.saveAttendanceLogsLocal();
+            this.renderAll();
+            await this.pushCloudSnapshot();
+            this.showToast('Attendance entry deleted');
+          }
+        );
+      }
+
+      exportAttendanceCSV() {
+        const headers = ['Date', 'Username', 'JoinedTime', 'LeftTime', 'OfficeDurationMinutes', 'OfficeDurationFormatted', 'LoginTimestampISO', 'LogoutTimestampISO'];
+        const rows = this.attendanceLogs
+          .slice()
+          .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.loginTime || 0) - (b.loginTime || 0))
+          .map(a => {
+            const ms = this.getAttendanceDurationMs(a);
+            const mins = Math.floor(ms / 60000);
+            const fmt = StopwatchEngine.formatSummaryHoursMinutes(ms);
+            return [
+              a.date,
+              a.username || this.allowedUsername,
+              StopwatchEngine.formatClockTime(a.loginTime),
+              a.logoutTime ? StopwatchEngine.formatClockTime(a.logoutTime) : 'Active',
+              mins,
+              fmt,
+              a.loginTime ? new Date(a.loginTime).toISOString() : '',
+              a.logoutTime ? new Date(a.logoutTime).toISOString() : ''
+            ].map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',');
+          });
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        this.triggerDownload(blob, `qa-office-attendance-${this.getTodayISO()}.csv`);
+        this.showToast('Attendance CSV exported');
+      }
+
+      // ---- Username-Only Auth & GitHub Gist Sync (No Firebase Needed) ----
+      getGistToken() {
+        return (localStorage.getItem(this.gistTokenStorageKey) || '').trim();
+      }
+
+      getGistId() {
+        return (localStorage.getItem(this.gistIdStorageKey) || '').trim();
+      }
+
+      getActiveUsername() {
+        return localStorage.getItem(this.authStorageKey) || '';
+      }
+
+      getGistFilename() {
+        const user = this.getActiveUsername() || this.allowedUsername;
+        return `qa_tracker_${user}.json`;
+      }
+
+      setCloudSyncUI(state, label) {
+        const dot = document.getElementById('cloudSyncDot');
+        const text = document.getElementById('cloudSyncText');
+        const badge = document.getElementById('settingsSyncStateBadge');
+        const dotColors = {
+          synced: 'bg-emerald-400',
+          syncing: 'bg-amber-400 animate-ping',
+          error: 'bg-rose-500',
+          local: 'bg-slate-500'
+        };
+        if (dot) dot.className = `w-2 h-2 rounded-full ${dotColors[state] || 'bg-slate-500'}`;
+        if (text) text.textContent = label;
+        if (badge) {
+          badge.textContent = label;
+          badge.className = `text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-950 border self-start sm:self-auto ${
+            state === 'synced' ? 'border-emerald-500/40 text-emerald-400' :
+            state === 'error' ? 'border-rose-500/40 text-rose-400' :
+            state === 'syncing' ? 'border-amber-500/40 text-amber-300' :
+            'border-slate-800 text-slate-400'
+          }`;
+        }
+      }
+
+      async saveGistConfig() {
+        const tokenInput = document.getElementById('gistTokenInput');
+        const idInput = document.getElementById('gistIdInput');
+        const token = (tokenInput?.value || '').trim();
+        const gistId = (idInput?.value || '').trim();
+
+        if (!token) {
+          this.showToast('Please paste your GitHub Token first', true);
+          return;
+        }
+        localStorage.setItem(this.gistTokenStorageKey, token);
+        if (gistId) {
+          localStorage.setItem(this.gistIdStorageKey, gistId);
+        } else {
+          localStorage.removeItem(this.gistIdStorageKey);
+        }
+        this.showToast('Connecting to GitHub Gist...');
+        await this.syncWithCloud(true);
+      }
+
+      disconnectGist() {
+        localStorage.removeItem(this.gistTokenStorageKey);
+        localStorage.removeItem(this.gistIdStorageKey);
+        const tokenInput = document.getElementById('gistTokenInput');
+        const idInput = document.getElementById('gistIdInput');
+        if (tokenInput) tokenInput.value = '';
+        if (idInput) idInput.value = '';
+        this.setCloudSyncUI('local', 'Local Only');
+        this.showToast('GitHub Gist Sync disconnected');
+      }
+
+      async manualCloudSync() {
+        if (!this.getGistToken()) {
+          this.switchView('settings');
+          this.showToast('Paste your GitHub Token in Settings to enable Sync');
+          return;
+        }
+        await this.syncWithCloud(true);
+      }
+
+      buildCloudPayload() {
+        const tasksRecord = {};
+        this.allTasks.forEach(t => { tasksRecord[t.id] = t; });
+        const attRecord = {};
+        this.attendanceLogs.forEach(a => { attRecord[a.id] = a; });
+        return {
+          username: this.getActiveUsername() || this.allowedUsername,
+          updatedAt: Date.now(),
+          deletedIds: [...this.db.getDeletedIdsSet()],
+          tasks: tasksRecord,
+          attendanceLogs: attRecord
+        };
+      }
+
+      async createPrivateGist(token) {
+        const filename = this.getGistFilename();
+        const res = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            description: `QA Office Task Tracker Sync (${this.getActiveUsername() || this.allowedUsername})`,
+            public: false,
+            files: {
+              [filename]: { content: JSON.stringify(this.buildCloudPayload(), null, 2) }
+            }
+          })
+        });
+        if (!res.ok) throw new Error(`Create Gist HTTP ${res.status}`);
+        const created = await res.json();
+        localStorage.setItem(this.gistIdStorageKey, created.id);
+        const idInput = document.getElementById('gistIdInput');
+        if (idInput) idInput.value = created.id;
+        return created.id;
+      }
+
+      async syncWithCloud(showFeedback = false) {
+        const token = this.getGistToken();
+        const user = this.getActiveUsername();
+        if (!token || !user || this.isSyncingCloud) {
+          if (!token) this.setCloudSyncUI('local', 'Local Only');
+          return;
+        }
+
+        this.isSyncingCloud = true;
+        this.setCloudSyncUI('syncing', 'Syncing...');
+        try {
+          let gistId = this.getGistId();
+          if (!gistId) {
+            gistId = await this.createPrivateGist(token);
+            this.setCloudSyncUI('synced', 'Synced');
+            this.renderAll();
+            if (showFeedback) this.showToast(`Created private Gist (${gistId}) & synced!`);
+            return;
+          }
+
+          const res = await fetch(`https://api.github.com/gists/${encodeURIComponent(gistId)}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github+json'
+            },
+            cache: 'no-store'
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const gistData = await res.json();
+          const filename = this.getGistFilename();
+          const fileObj = gistData.files?.[filename] || Object.values(gistData.files || {})[0];
+          const remote = fileObj && fileObj.content ? JSON.parse(fileObj.content) : {};
+
+          const remoteTasksObj = remote.tasks || {};
+          const remoteTasks = Array.isArray(remoteTasksObj)
+            ? remoteTasksObj.filter(Boolean)
+            : Object.values(remoteTasksObj).filter(Boolean);
+          const remoteDeleted = new Set(Array.isArray(remote.deletedIds) ? remote.deletedIds.map(String) : []);
+          const localDeleted = this.db.getDeletedIdsSet();
+          const mergedDeleted = new Set([...localDeleted, ...remoteDeleted]);
+
+          if (mergedDeleted.size > localDeleted.size) {
+            this.db.markIdsAsDeleted([...mergedDeleted]);
+          }
+
+          const mergedMap = new Map();
+          [...this.allTasks, ...remoteTasks].forEach(t => {
+            if (!t || !t.id || mergedDeleted.has(String(t.id))) return;
+            const prev = mergedMap.get(t.id);
+            if (!prev || (Number(t.updatedAt) || 0) >= (Number(prev.updatedAt) || 0)) {
+              mergedMap.set(t.id, t);
+            }
+          });
+          this.allTasks = Array.from(mergedMap.values());
+          this.syncMirrorImmediately();
+
+          const remoteAttObj = remote.attendanceLogs || {};
+          const remoteAtt = Array.isArray(remoteAttObj)
+            ? remoteAttObj.filter(Boolean)
+            : Object.values(remoteAttObj).filter(Boolean);
+          const mergedAttMap = new Map();
+          [...this.attendanceLogs, ...remoteAtt].forEach(a => {
+            if (!a || !a.id || mergedDeleted.has(String(a.id))) return;
+            const prev = mergedAttMap.get(a.id);
+            if (!prev || (Number(a.updatedAt) || 0) >= (Number(prev.updatedAt) || 0)) {
+              mergedAttMap.set(a.id, a);
+            }
+          });
+          this.attendanceLogs = Array.from(mergedAttMap.values());
+          this.saveAttendanceLogsLocal();
+
+          try {
+            if (this.db && this.db.db) {
+              await this.db.importBulkTasks(this.allTasks, false);
+            }
+          } catch (e) {}
+
+          await this.pushCloudSnapshot();
+          this.setCloudSyncUI('synced', 'Synced');
+          this.renderAll();
+          if (showFeedback) this.showToast(`Synced ${this.allTasks.length} tasks via GitHub Gist`);
+        } catch (err) {
+          console.warn('GitHub Gist sync failed:', err);
+          this.setCloudSyncUI('error', 'Sync Error');
+          if (showFeedback) this.showToast('Sync failed — check your GitHub Token & Gist ID', true);
+        } finally {
+          this.isSyncingCloud = false;
+        }
+      }
+
+      async pushCloudSnapshot() {
+        const token = this.getGistToken();
+        const user = this.getActiveUsername();
+        if (!token || !user) return;
+        try {
+          let gistId = this.getGistId();
+          if (!gistId) {
+            await this.createPrivateGist(token);
+            this.setCloudSyncUI('synced', 'Synced');
+            return;
+          }
+          const filename = this.getGistFilename();
+          const res = await fetch(`https://api.github.com/gists/${encodeURIComponent(gistId)}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              files: {
+                [filename]: { content: JSON.stringify(this.buildCloudPayload(), null, 2) }
+              }
+            })
+          });
+          if (res.ok) this.setCloudSyncUI('synced', 'Synced');
+        } catch (e) {
+          this.setCloudSyncUI('error', 'Sync Error');
+        }
+      }
+
+      checkAuth() {
+        const savedUser = localStorage.getItem(this.authStorageKey);
+        const overlay = document.getElementById('loginOverlay');
+        const userControls = document.getElementById('headerUserControls');
+        const headerBadge = document.getElementById('headerUsernameBadge');
+        const settingsLabel = document.getElementById('settingsUsernameLabel');
+
+        if (savedUser === this.allowedUsername) {
+          if (overlay) overlay.classList.add('hidden');
+          if (userControls) {
+            userControls.classList.remove('hidden');
+            userControls.classList.add('flex');
+          }
+          if (headerBadge) headerBadge.textContent = savedUser;
+          if (settingsLabel) settingsLabel.textContent = savedUser;
+        } else {
+          if (overlay) overlay.classList.remove('hidden');
+          if (userControls) {
+            userControls.classList.add('hidden');
+            userControls.classList.remove('flex');
+          }
+          setTimeout(() => {
+            const input = document.getElementById('loginUsernameInput');
+            if (input) input.focus();
+          }, 50);
+        }
+      }
+
+      async handleLoginSubmit(event) {
+        event.preventDefault();
+        const input = document.getElementById('loginUsernameInput');
+        const errorEl = document.getElementById('loginErrorMsg');
+        const entered = (input?.value || '').trim();
+
+        if (entered === this.allowedUsername) {
+          localStorage.setItem(this.authStorageKey, entered);
+          if (errorEl) errorEl.classList.add('hidden');
+          if (input) input.value = '';
+          const entry = this.recordOfficeLogin(entered);
+          this.checkAuth();
+          this.renderAll();
+          this.showToast(`Joined office at ${StopwatchEngine.formatClockTime(entry.loginTime)} — Welcome, ${entered}!`);
+          await this.syncWithCloud(false);
+        } else {
+          if (errorEl) {
+            errorEl.textContent = 'Invalid username. Please try again.';
+            errorEl.classList.remove('hidden');
+          }
+          if (input) input.focus();
+        }
+      }
+
+      async logout() {
+        const closed = this.recordOfficeLogout();
+        this.renderAll();
+        await this.pushCloudSnapshot();
+        localStorage.removeItem(this.authStorageKey);
+        this.checkAuth();
+        const outTime = closed ? StopwatchEngine.formatClockTime(closed.logoutTime) : StopwatchEngine.formatClockTime(Date.now());
+        this.showToast(`Left office at ${outTime} — Logged out`);
+      }
+
+      async init() {
+        if (this.initialized) return;
+        this.initialized = true;
+        this.checkAuth();
+        try {
+          await this.db.init();
+        } catch (err) {
+          console.warn('IndexedDB unavailable or restricted on file://, using localStorage fallback:', err);
+        }
+        this.loadAttendanceLogs();
+        await this.reloadTasksFromDB();
+        this.populatePCSelectPresets();
+        this.setupSwipeGestures();
+        this.setupPWA();
+        this.switchView(this.currentView || 'today');
+
+        // Start 200ms high-accuracy UI ticker for live stopwatches
+        this.tickInterval = setInterval(() => this.tickActiveTimers(), 200);
+
+        // Initial cloud sync + background polling every 15s
+        this.syncWithCloud(false);
+        this.cloudSyncInterval = setInterval(() => {
+          if (!document.hidden && this.getActiveUsername()) {
+            this.syncWithCloud(false);
+          }
+        }, 15000);
+
+        // Recalculate & sync immediately when waking phone or switching back to browser tab
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            this.tickActiveTimers();
+            this.syncWithCloud(false);
+          }
+        });
+      }
+
+      async reloadTasksFromDB() {
+        const deletedSet = this.db.getDeletedIdsSet();
+        let dbTasks = [];
+        try {
+          if (this.db && this.db.db) {
+            dbTasks = await this.db.getAllTasks();
+          }
+        } catch (e) {
+          console.warn('Fallback to localStorage mirror read:', e);
+        }
+
+        // Also merge from localStorage mirror so file:/// never loses tasks if IDB is blocked
+        let mirrorTasks = [];
+        try {
+          const rawMirror = localStorage.getItem('qa_tracker_tasks_mirror_v1');
+          if (rawMirror) {
+            const parsed = JSON.parse(rawMirror);
+            if (Array.isArray(parsed)) mirrorTasks = parsed;
+          }
+        } catch (e) {}
+
+        // Also check active timer emergency slot
+        try {
+          const rawActive = localStorage.getItem('qa_tracker_active_timer_v2');
+          if (rawActive) {
+            const parsedActive = JSON.parse(rawActive);
+            if (parsedActive && parsedActive.id && !deletedSet.has(String(parsedActive.id))) {
+              mirrorTasks.push(parsedActive);
+            }
+          }
+        } catch (e) {}
+
+        const combinedMap = new Map();
+        [...mirrorTasks, ...dbTasks].forEach(t => {
+          if (!t || !t.id || deletedSet.has(String(t.id))) return;
+          const prev = combinedMap.get(t.id);
+          if (!prev || (Number(t.updatedAt) || 0) >= (Number(prev.updatedAt) || 0)) {
+            combinedMap.set(t.id, t);
+          }
+        });
+
+        this.allTasks = Array.from(combinedMap.values());
+
+        try {
+          localStorage.setItem('qa_tracker_tasks_mirror_v1', JSON.stringify(this.allTasks));
+        } catch (e) {}
+
+        this.updateRecentGamesAutocomplete();
+      }
+
+      syncMirrorImmediately() {
+        try {
+          localStorage.setItem('qa_tracker_tasks_mirror_v1', JSON.stringify(this.allTasks));
+          const running = this.getCurrentlyRunningTask();
+          if (running) {
+            localStorage.setItem('qa_tracker_active_timer_v2', JSON.stringify(running));
+          } else {
+            localStorage.removeItem('qa_tracker_active_timer_v2');
+          }
+        } catch (e) {}
+      }
+
+      async saveTaskAndSync(task) {
+        task.updatedAt = Date.now();
+        // 1. Update in-memory state and localStorage synchronously FIRST so UI never blocks
+        const idx = this.allTasks.findIndex(t => t.id === task.id);
+        if (idx >= 0) {
+          this.allTasks[idx] = task;
+        } else {
+          this.allTasks.push(task);
+        }
+        this.syncMirrorImmediately();
+        this.updateRecentGamesAutocomplete();
+
+        // 2. Persist to IndexedDB safely in background
+        try {
+          if (this.db && this.db.db) {
+            await this.db.saveTask(task, true);
+          }
+        } catch (e) {
+          console.warn('IDB save fallback handled via localStorage:', e);
+        }
+        this.pushCloudSnapshot();
+      }
+
+      async deleteTaskAndSync(taskId) {
+        this.db.markIdsAsDeleted([taskId]);
+        this.allTasks = this.allTasks.filter(t => t.id !== taskId);
+        this.syncMirrorImmediately();
+        try {
+          if (this.db && this.db.db) {
+            await this.db.deleteTask(taskId);
+          }
+        } catch (e) {}
+        this.updateRecentGamesAutocomplete();
+        this.pushCloudSnapshot();
+      }
+
+      populatePCSelectPresets() {
+        const opts = ['<option value="">Pick 01–40</option>'];
+        const dlOpts = [];
+        for (let i = 1; i <= 40; i++) {
+          const val = String(i).padStart(2, '0');
+          opts.push(`<option value="${val}">PC ${val}</option>`);
+          dlOpts.push(`<option value="${val}">PC ${val}</option>`);
+        }
+        const quickSel = document.getElementById('stopModalPCQuickSelect');
+        if (quickSel) quickSel.innerHTML = opts.join('');
+        const dl = document.getElementById('pcNumberPresets');
+        if (dl) dl.innerHTML = dlOpts.join('');
+
+        const pillsContainer = document.getElementById('stopModalQuickPCPills');
+        if (pillsContainer) {
+          const quickPCs = [];
+          for (let i = 1; i <= 12; i++) {
+            const val = String(i).padStart(2, '0');
+            quickPCs.push(`
+              <button type="button" onclick="document.getElementById('stopModalPCInput').value='${val}'; document.getElementById('stopModalPCQuickSelect').value='${val}';" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-sky-600 text-[10px] font-mono text-slate-300 hover:text-white border border-slate-700 transition">
+                ${val}
+              </button>
+            `);
+          }
+          pillsContainer.innerHTML = quickPCs.join('');
+        }
+      }
+
+      selectDate(isoDate) {
+        this.selectedDate = isoDate;
+        if (this.currentView !== 'today') {
+          this.switchView('today');
+        } else {
+          this.renderAll();
+        }
+      }
+
+      onDatePickerChange(val) {
+        if (val) {
+          this.selectedDate = val;
+          this.renderAll();
+        }
+      }
+
+      setDayListFilter(filter) {
+        this.dayListFilter = filter;
+        this.renderTodayTaskList();
+      }
+
+      // ---- Active Running Task Management ----
+      getCurrentlyRunningTask() {
+        return this.allTasks.find(t => t.isRunning) || null;
+      }
+
+      jumpToRunningTask() {
+        const running = this.getCurrentlyRunningTask();
+        if (!running) return;
+        this.selectedDate = running.date;
+        this.switchView('today');
+        setTimeout(() => {
+          const hero = document.getElementById('primaryTimerHeroContainer');
+          if (hero) hero.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+
+      // ---- Rendering Methods ----
+      renderAll() {
+        this.updateGlobalRunningBanner();
+        if (this.currentView === 'today') {
+          this.renderDateHeaderAndWeekStrip();
+          this.renderPrimaryTimerHero();
+          this.renderDailySummary();
+          this.renderDayAttendance();
+          this.renderTodayTaskList();
+        } else if (this.currentView === 'history') {
+          this.renderHistory();
+        } else if (this.currentView === 'summary') {
+          this.renderWeeklySummary();
+        } else if (this.currentView === 'settings') {
+          const lbl = document.getElementById('settingsCurrentDayLabel');
+          if (lbl) lbl.textContent = this.selectedDate;
+          const tokenInput = document.getElementById('gistTokenInput');
+          if (tokenInput && document.activeElement !== tokenInput) {
+            tokenInput.value = this.getGistToken();
+          }
+          const idInput = document.getElementById('gistIdInput');
+          if (idInput && document.activeElement !== idInput) {
+            idInput.value = this.getGistId();
+          }
+        }
+      }
+
+      renderPrimaryTimerHero() {
+        const container = document.getElementById('primaryTimerHeroContainer');
+        if (!container) return;
+
+        const activeTask = this.getCurrentlyRunningTask();
+
+        if (!activeTask) {
+          container.className = 'bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-xl text-center';
+          container.innerHTML = `
+            <div class="max-w-xl mx-auto space-y-4">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-xs font-mono text-sky-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                READY FOR NEW TASK • ${this.selectedDate}
+              </div>
+              <div class="font-mono font-extrabold text-3xl sm:text-5xl text-slate-400 tracking-tight tabular-nums">
+                00:00:00
+              </div>
+              <div class="space-y-1">
+                <h2 class="text-base sm:text-xl font-bold text-white tracking-tight">Press Start When You Begin Working</h2>
+                <p class="text-xs sm:text-sm text-slate-400">Timer starts immediately. When you press <b class="text-slate-200">STOP</b>, you will enter the <b class="text-sky-300">PC Number</b>, <b class="text-sky-300">Game Name</b>, <b class="text-sky-300">Session ID</b>, <b class="text-sky-300">Task ID</b> & optional note.</p>
+              </div>
+              <div class="pt-1">
+                <button type="button" onclick="app.startStopwatchNow()" class="w-full sm:w-auto sm:min-w-[280px] px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold text-base sm:text-lg tracking-wide shadow-xl shadow-emerald-950/60 transition inline-flex items-center justify-center gap-3 cursor-pointer">
+                  <span class="text-xl">▶</span> START TASK
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          const elapsedMs = StopwatchEngine.getElapsedMs(activeTask);
+          const clockStr = StopwatchEngine.formatHMS(elapsedMs);
+          const startedAtStr = StopwatchEngine.formatClockTime(activeTask.startTimestamp);
+          const hasPC = activeTask.pcNumber !== null && activeTask.pcNumber !== undefined && activeTask.pcNumber !== '';
+          const pcBadge = hasPC
+            ? `PC ${this.formatPCNumber(activeTask.pcNumber)}`
+            : 'PC Assigned on Stop';
+          const gameTitle = activeTask.gameName
+            ? `${this.escapeHTML(activeTask.gameName)} • ${this.escapeHTML(activeTask.taskId || '')}`
+            : 'Work Session in Progress...';
+
+          container.className = `bg-slate-900 border-2 ${activeTask.isPaused ? 'border-amber-500/50' : 'running-card border-amber-500'} rounded-2xl p-5 sm:p-7 shadow-2xl`;
+          container.innerHTML = `
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div class="space-y-2 text-center lg:text-left">
+                <div class="flex items-center justify-center lg:justify-start flex-wrap gap-2">
+                  <span class="px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 font-mono font-bold text-amber-300 text-xs">${pcBadge}</span>
+                  ${this.getStatusBadgeHTML(activeTask.status, activeTask.isPaused, activeTask.isRunning)}
+                  <span class="text-xs font-mono text-slate-400">Started at <b class="text-slate-200">${startedAtStr}</b></span>
+                </div>
+                <div class="text-lg sm:text-xl font-bold text-white">${gameTitle}</div>
+                <p class="text-xs text-slate-400">Press <b class="text-rose-300">STOP</b> when done to choose/enter PC number, Game Name, Session ID, Task ID, Note & Payment.</p>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-4 bg-slate-950/90 border border-slate-800 rounded-2xl p-4 sm:px-6">
+                <div class="text-center sm:text-right">
+                  <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400">${activeTask.isPaused ? 'PAUSED STOPWATCH' : 'ELAPSED WORK TIME'}</div>
+                  <div data-timer-id="${activeTask.id}" class="font-mono font-extrabold text-3xl sm:text-4xl tracking-tight tabular-nums ${activeTask.isPaused ? 'text-slate-200' : 'text-amber-400'}">${clockStr}</div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
+                  ${
+                    activeTask.isPaused
+                      ? `<button type="button" onclick="app.resumeTaskTimer('${activeTask.id}')" class="px-5 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 shadow cursor-pointer">▶ RESUME</button>`
+                      : `<button type="button" onclick="app.pauseTaskTimer('${activeTask.id}')" class="px-5 py-3.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 shadow cursor-pointer">⏸ PAUSE</button>`
+                  }
+                  <button type="button" onclick="app.stopTaskTimerPrompt('${activeTask.id}')" class="px-6 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-extrabold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 shadow-lg cursor-pointer">
+                    ⏹ STOP
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      renderDateHeaderAndWeekStrip() {
+        const d = this.parseISODate(this.selectedDate);
+        const todayISO = this.getTodayISO();
+        const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+        const monthNames = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+        const shortMonths = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+        document.getElementById('displayDayName').textContent = dayNames[d.getDay()];
+        document.getElementById('displayFullDate').textContent = `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+        document.getElementById('datePickerInput').value = this.selectedDate;
+
+        const isTodayTag = document.getElementById('displayIsTodayTag');
+        isTodayTag.classList.toggle('hidden', this.selectedDate !== todayISO);
+
+        // Week range label
+        const weekDates = this.getWeekDates(this.selectedDate);
+        const startD = this.parseISODate(weekDates[0]);
+        const endD = this.parseISODate(weekDates[6]);
+        document.getElementById('displayWeekRange').textContent =
+          `WEEK OF ${shortMonths[startD.getMonth()]} ${String(startD.getDate()).padStart(2, '0')} – ${shortMonths[endD.getMonth()]} ${String(endD.getDate()).padStart(2, '0')}`;
+
+        // Render 7-day selector pills
+        const shortDayLabels = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+        const strip = document.getElementById('weekDaysStrip');
+        strip.innerHTML = weekDates.map((iso, idx) => {
+          const dayObj = this.parseISODate(iso);
+          const isSelected = iso === this.selectedDate;
+          const isToday = iso === todayISO;
+          const dayTasks = this.allTasks.filter(t => t.date === iso && !t.isRunning);
+          const hasRunning = this.allTasks.some(t => t.date === iso && t.isRunning);
+
+          let btnClasses = 'bg-slate-950/90 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200';
+          if (isSelected) {
+            btnClasses = 'bg-sky-600/20 border-sky-500 text-white shadow-sm';
+          } else if (isToday) {
+            btnClasses = 'bg-slate-900 border-emerald-500/50 text-emerald-300';
+          }
+
+          return `
+            <button onclick="app.selectDate('${iso}')" class="border rounded-lg p-1.5 sm:p-2 text-center transition flex flex-col items-center justify-center relative ${btnClasses}">
+              <span class="text-[10px] font-bold tracking-wider uppercase">${shortDayLabels[idx]}</span>
+              <span class="text-xs sm:text-sm font-mono font-bold mt-0.5">${String(dayObj.getDate()).padStart(2, '0')}</span>
+              <div class="flex items-center gap-1 mt-1 h-3">
+                ${dayTasks.length > 0 ? `<span class="text-[9px] font-mono px-1 rounded bg-slate-800 text-slate-300">${dayTasks.length}</span>` : ''}
+                ${hasRunning ? `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>` : ''}
+              </div>
+            </button>
+          `;
+        }).join('');
+      }
+
+      renderDailySummary() {
+        const dayTasks = this.allTasks.filter(t => t.date === this.selectedDate);
+        const loggedTasks = dayTasks.filter(t => !t.isRunning || t.gameName);
+        const completed = loggedTasks.filter(t => t.status === 'COMPLETED').length;
+        const inProgress = dayTasks.filter(t => t.status === 'IN_PROGRESS').length;
+        const blocked = loggedTasks.filter(t => t.status === 'BLOCKED').length;
+        const paidCount = loggedTasks.filter(t => Boolean(t.paymentDone)).length;
+        const totalMs = dayTasks.reduce((acc, t) => acc + StopwatchEngine.getElapsedMs(t), 0);
+        const totalPayment = dayTasks.reduce((acc, t) => acc + (Number(t.payment) || 0), 0);
+
+        document.getElementById('metricTasksCount').textContent = loggedTasks.length;
+        document.getElementById('metricCompleted').textContent = completed;
+        document.getElementById('metricInProgBlocked').textContent = `${inProgress} / ${blocked}`;
+        document.getElementById('metricPaidCount').innerHTML = `${paidCount} <span class="text-xs font-normal text-slate-500">/ ${loggedTasks.length}</span>`;
+        document.getElementById('metricWorkTime').textContent = StopwatchEngine.formatSummaryHoursMinutes(totalMs);
+        document.getElementById('metricPayment').textContent = this.formatCurrency(totalPayment);
+      }
+
+      getStatusBadgeHTML(status, isPaused = false, isRunning = false) {
+        if (isRunning && !isPaused) {
+          return `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>RUNNING</span>`;
+        }
+        if (isPaused) {
+          return `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">⏸ PAUSED</span>`;
+        }
+        switch (status) {
+          case 'COMPLETED':
+            return `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">🟢 COMPLETED</span>`;
+          case 'IN_PROGRESS':
+            return `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">🟡 IN PROGRESS</span>`;
+          case 'BLOCKED':
+            return `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">🔴 BLOCKED</span>`;
+          default:
+            return `<span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">⚪ NOT STARTED</span>`;
+        }
+      }
+
+      renderTodayTaskList() {
+        document.getElementById('todayListDateLabel').textContent = this.selectedDate;
+
+        document.querySelectorAll('.day-filter-btn').forEach(btn => {
+          const active = btn.getAttribute('data-dfilter') === this.dayListFilter;
+          btn.className = `day-filter-btn px-2.5 py-1 rounded text-[11px] font-semibold transition ${
+            active ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'
+          }`;
+        });
+
+        let dayTasks = this.allTasks.filter(t => t.date === this.selectedDate && (!t.isRunning || t.gameName));
+        document.getElementById('todayTasksBadge').textContent = dayTasks.length;
+
+        if (this.dayListFilter === 'PAID') dayTasks = dayTasks.filter(t => Boolean(t.paymentDone));
+        else if (this.dayListFilter === 'UNPAID') dayTasks = dayTasks.filter(t => !t.paymentDone);
+        else if (this.dayListFilter === 'COMPLETED') dayTasks = dayTasks.filter(t => t.status === 'COMPLETED');
+
+        // Sort newest first
+        dayTasks.sort((a, b) => (b.startTimestamp || b.createdAt || 0) - (a.startTimestamp || a.createdAt || 0));
+
+        const container = document.getElementById('todayTasksListContainer');
+        if (dayTasks.length === 0) {
+          container.innerHTML = `
+            <div class="p-8 text-center space-y-2">
+              <div class="text-slate-400 text-sm">No tasks logged for <span class="font-mono text-slate-300">${this.selectedDate}</span> matching this filter.</div>
+              <div class="text-xs text-slate-500">Press <b class="text-emerald-400">▶ START TASK</b> above to start timing your work, or click <b>＋ Manual Entry</b>.</div>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = dayTasks.map(t => this.buildTaskRowHTML(t, false)).join('');
+      }
+
+      buildTaskRowHTML(t, showDate = true) {
+        const pcText = `PC ${this.formatPCNumber(t.pcNumber)}`;
+        const dur = StopwatchEngine.formatHumanDuration(StopwatchEngine.getElapsedMs(t));
+        const clockSpan = `${StopwatchEngine.formatClockTime(t.startTimestamp)} – ${StopwatchEngine.formatClockTime(t.endTimestamp)}`;
+        const isPaid = Boolean(t.paymentDone);
+        const payAmt = Number(t.payment) || 0;
+        const dObj = this.parseISODate(t.date);
+        const dateFormatted = dObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+        return `
+          <div class="p-3.5 sm:px-5 hover:bg-slate-800/40 transition flex flex-col md:grid md:grid-cols-12 gap-3 md:items-center">
+            <!-- Col 1: PC Number (& Date) -->
+            <div onclick="app.openTaskDetailsModal('${t.id}')" class="md:col-span-2 flex items-center justify-between md:justify-start gap-2.5 cursor-pointer">
+              <div class="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 font-mono font-bold text-xs sm:text-sm text-sky-400 shrink-0">
+                ${this.escapeHTML(pcText)}
+              </div>
+              <div class="text-right md:text-left">
+                ${showDate ? `<div class="text-xs font-mono font-semibold text-slate-300">${dateFormatted}</div>` : ''}
+                <div class="text-[10px] font-mono text-slate-500">${clockSpan}</div>
+              </div>
+            </div>
+
+            <!-- Col 2: Game Name -->
+            <div onclick="app.openTaskDetailsModal('${t.id}')" class="md:col-span-2 cursor-pointer min-w-0">
+              <div class="font-bold text-sm text-white truncate">${this.escapeHTML(t.gameName || 'Unnamed Game')}</div>
+              ${t.notes ? `<div class="text-[11px] text-slate-400 italic truncate mt-0.5" title="${this.escapeHTML(t.notes)}">"${this.escapeHTML(t.notes)}"</div>` : ''}
+            </div>
+
+            <!-- Col 3: Session ID & Task ID -->
+            <div onclick="app.openTaskDetailsModal('${t.id}')" class="md:col-span-3 flex items-center flex-wrap gap-1.5 cursor-pointer font-mono text-xs">
+              <span class="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-100 font-semibold">${this.escapeHTML(t.taskId || '—')}</span>
+              <span class="px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-400">${this.escapeHTML(t.chunkId || '—')}</span>
+            </div>
+
+            <!-- Col 4: Duration & Status -->
+            <div onclick="app.openTaskDetailsModal('${t.id}')" class="md:col-span-2 flex items-center justify-between md:justify-start gap-2.5 cursor-pointer">
+              <span data-timer-id="${t.id}" class="font-mono font-bold text-xs sm:text-sm text-sky-400 tabular-nums">${dur}</span>
+              ${this.getStatusBadgeHTML(t.status, t.isPaused, t.isRunning)}
+            </div>
+
+            <!-- Col 5: Payment Done Toggle (Checkable Anytime) + Actions -->
+            <div class="md:col-span-3 flex items-center justify-between md:justify-end gap-1.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800/70">
+              <button type="button" onclick="app.toggleTaskPaymentDone('${t.id}', event)" class="px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold flex items-center gap-1.5 transition ${
+                isPaid
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }" title="Click to toggle Payment Done / Pending">
+                <span>${isPaid ? '☑ Paid' : '☐ Unpaid'}</span>
+                ${payAmt > 0 ? `<span class="text-emerald-400">(${this.formatCurrency(payAmt)})</span>` : ''}
+              </button>
+
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="app.openTaskDetailsModal('${t.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700/80 transition">
+                  Details
+                </button>
+                <button type="button" onclick="app.quickDeleteTaskRow('${t.id}', event)" class="px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-300 text-xs font-bold border border-rose-800/60 transition" title="Permanently Delete Task">
+                  🗑
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      async quickDeleteTaskRow(taskId, event) {
+        if (event) event.stopPropagation();
+        const task = this.allTasks.find(t => t.id === taskId);
+        if (!task) return;
+        this.showConfirmModal(
+          `Delete PC ${this.formatPCNumber(task.pcNumber)} Task?`,
+          `Permanently delete "${task.gameName || 'Task'} (${task.taskId || '—'})"? It will never reappear on refresh.`,
+          'Delete Forever',
+          async () => {
+            await this.deleteTaskAndSync(task.id);
+            this.renderAll();
+            this.showToast(`Deleted "${task.gameName || 'Task'}" permanently`);
+          }
+        );
+      }
+
+      confirmDeleteAllTasks() {
+        if (this.allTasks.length === 0) {
+          this.showToast('Task list is already empty');
+          return;
+        }
+        this.showConfirmModal(
+          `Wipe All ${this.allTasks.length} Task(s) Permanently?`,
+          `Are you sure you want to permanently delete all ${this.allTasks.length} task(s) on this device? They will not come back on refresh.`,
+          'Yes, Wipe All Data',
+          async () => {
+            const ids = this.allTasks.map(t => t.id);
+            await this.db.deleteMultipleTasks(ids);
+            await this.reloadTasksFromDB();
+            this.renderAll();
+            await this.pushCloudSnapshot();
+            this.showToast('All tasks permanently wiped');
+          }
+        );
+      }
+
+      async toggleTaskPaymentDone(taskId, event) {
+        if (event) event.stopPropagation();
+        const task = this.allTasks.find(t => t.id === taskId);
+        if (!task) return;
+        task.paymentDone = !Boolean(task.paymentDone);
+        await this.saveTaskAndSync(task);
+        this.renderAll();
+        this.showToast(
+          `PC ${this.formatPCNumber(task.pcNumber)} (${task.taskId || 'Task'}): ${
+            task.paymentDone ? 'Marked Payment DONE ✅' : 'Marked Payment UNPAID ⏳'
+          }`
+        );
+      }
+
+      // ---- Live Stopwatch Ticker ----
+      tickActiveTimers() {
+        const runningTask = this.getCurrentlyRunningTask();
+        this.updateGlobalRunningBanner(runningTask);
+
+        // Update any visible timer DOM elements
+        document.querySelectorAll('[data-timer-id]').forEach(el => {
+          const tId = el.getAttribute('data-timer-id');
+          const task = this.allTasks.find(t => t.id === tId);
+          if (task && task.isRunning) {
+            el.textContent = StopwatchEngine.formatHMS(StopwatchEngine.getElapsedMs(task));
+          }
+        });
+
+        // Update daily total work time if running task is on selectedDate
+        if (runningTask && runningTask.date === this.selectedDate && this.currentView === 'today') {
+          const dayTasks = this.allTasks.filter(t => t.date === this.selectedDate);
+          const totalMs = dayTasks.reduce((acc, t) => acc + StopwatchEngine.getElapsedMs(t), 0);
+          const workTimeEl = document.getElementById('metricWorkTime');
+          if (workTimeEl) {
+            workTimeEl.textContent = StopwatchEngine.formatSummaryHoursMinutes(totalMs);
+          }
+        }
+
+        // Keep live Office Time updated on Today view if currently logged in
+        if (this.currentView === 'today') {
+          const attSummary = this.getDayAttendanceSummary(this.selectedDate);
+          if (attSummary.isInOffice) {
+            const attDurEl = document.getElementById('attTotalDuration');
+            if (attDurEl) {
+              attDurEl.textContent = StopwatchEngine.formatSummaryHoursMinutes(attSummary.totalMs);
+            }
+          }
+        }
+      }
+
+      updateGlobalRunningBanner(runningTask = this.getCurrentlyRunningTask()) {
+        const banner = document.getElementById('globalActiveTimerBanner');
+        if (!runningTask) {
+          banner.classList.add('hidden');
+          banner.classList.remove('flex');
+          return;
+        }
+        banner.classList.remove('hidden');
+        banner.classList.add('flex');
+        document.getElementById('globalActiveTimerPC').textContent = runningTask.pcNumber
+          ? `PC ${this.formatPCNumber(runningTask.pcNumber)}`
+          : 'RUNNING';
+        document.getElementById('globalActiveTimerGame').textContent = runningTask.gameName || 'Task Timer';
+        document.getElementById('globalActiveTimerClock').textContent = StopwatchEngine.formatHMS(StopwatchEngine.getElapsedMs(runningTask));
+      }
+
+      // ---- PRIMARY WORKFLOW: Instant Start Task -> Stop -> Enter PC, Game, Session ID, Task ID, Note, Payment ----
+      startStopwatchNow() {
+        return this.startImmediateTask();
+      }
+
+      async startImmediateTask() {
+        const running = this.getCurrentlyRunningTask();
+        if (running) {
+          const runningLabel = running.pcNumber ? `PC ${this.formatPCNumber(running.pcNumber)}` : 'Current Task Timer';
+          this.showConfirmModal(
+            `${runningLabel} is already running.`,
+            `Only one active stopwatch is allowed at a time. Stop ${runningLabel} and start a new timer?`,
+            'Stop Current & Start New',
+            async () => {
+              await this.silentStopRunningTask(running);
+              await this.createAndStartImmediateSession();
+            }
+          );
+          return;
+        }
+        await this.createAndStartImmediateSession();
+      }
+
+      async createAndStartImmediateSession() {
+        const now = Date.now();
+        const id = this.makeUniqueTaskId(this.selectedDate);
+
+        const newTask = {
+          id,
+          date: this.selectedDate,
+          pcNumber: '',
+          gameName: '',
+          taskId: '',
+          chunkId: '',
+          status: 'IN_PROGRESS',
+          startTimestamp: now,
+          lastResumeTimestamp: now,
+          pauseTimestamp: null,
+          endTimestamp: null,
+          accumulatedDuration: 0,
+          isRunning: true,
+          isPaused: false,
+          payment: 0,
+          paymentDone: false,
+          notes: '',
+          createdAt: now,
+          updatedAt: now
+        };
+
+        // Update UI and localStorage immediately before awaiting IndexedDB
+        this.allTasks.push(newTask);
+        this.syncMirrorImmediately();
+        this.renderAll();
+        this.showToast('⏱ Stopwatch started! Press STOP when ready to enter PC, Game, Session ID & Task ID.');
+
+        await this.saveTaskAndSync(newTask);
+      }
+
+      // ---- Manual Add / Edit Task Modal ----
+      updateManualTimePreview() {
+        const input = document.getElementById('formWorkHours');
+        const preview = document.getElementById('formWorkTimePreview');
+        if (!preview) return;
+        const val = input ? parseFloat(input.value) || 0 : 0;
+        const ms = Math.max(0, Math.round(val * 3600 * 1000));
+        preview.textContent = StopwatchEngine.formatHumanDuration(ms);
+      }
+
+      setManualWorkHours(hrs) {
+        const input = document.getElementById('formWorkHours');
+        if (input) {
+          input.value = hrs;
+          this.updateManualTimePreview();
+        }
+      }
+
+      openManualAddTaskModal() {
+        const modal = document.getElementById('modalTaskForm');
+        document.getElementById('formModalPCBadge').textContent = 'MANUAL';
+        document.getElementById('formModalTitle').textContent = 'Add Manual Task Record';
+        document.getElementById('formModalDateSub').textContent = this.selectedDate;
+        document.getElementById('formTaskRecordId').value = '';
+        document.getElementById('formMode').value = 'create';
+        document.getElementById('formPCNumber').value = '';
+        document.getElementById('formGameName').value = '';
+        document.getElementById('formTaskId').value = '';
+        document.getElementById('formChunkId').value = '';
+        document.getElementById('formPayment').value = '';
+        document.getElementById('formPaymentDone').checked = false;
+        document.getElementById('formWorkHours').value = '';
+        this.updateManualTimePreview();
+        document.getElementById('formNotes').value = '';
+        document.getElementById('formStatus').value = 'COMPLETED';
+        document.getElementById('formSubmitBtn').innerHTML = `<span>💾</span> SAVE TASK`;
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => document.getElementById('formPCNumber').focus(), 50);
+      }
+
+      showStartModalUI(pcNumber, existingTask = null) {
+        const modal = document.getElementById('modalTaskForm');
+        const targetDate = existingTask ? existingTask.date : this.selectedDate;
+
+        document.getElementById('formModalPCBadge').textContent = existingTask && existingTask.pcNumber ? `PC ${this.formatPCNumber(existingTask.pcNumber)}` : (pcNumber ? `PC ${this.formatPCNumber(pcNumber)}` : 'TASK');
+        document.getElementById('formModalDateSub').textContent = targetDate;
+
+        if (existingTask) {
+          document.getElementById('formTaskRecordId').value = existingTask.id;
+          document.getElementById('formMode').value = 'edit';
+          document.getElementById('formModalTitle').textContent = 'Edit Task Details';
+          document.getElementById('formPCNumber').value = existingTask.pcNumber ? this.formatPCNumber(existingTask.pcNumber) : '';
+          document.getElementById('formGameName').value = existingTask.gameName || '';
+          document.getElementById('formTaskId').value = existingTask.taskId || '';
+          document.getElementById('formChunkId').value = existingTask.chunkId || '';
+          document.getElementById('formPayment').value = existingTask.payment ? String(existingTask.payment) : '';
+          document.getElementById('formPaymentDone').checked = Boolean(existingTask.paymentDone);
+          const existingDurMs = Number(existingTask.accumulatedDuration) || 0;
+          const existingDurHours = existingDurMs / 3600000;
+          document.getElementById('formWorkHours').value = existingDurHours > 0 ? (existingDurHours % 1 === 0 ? existingDurHours.toString() : parseFloat(existingDurHours.toFixed(2)).toString()) : '';
+          this.updateManualTimePreview();
+          document.getElementById('formNotes').value = existingTask.notes || '';
+          document.getElementById('formStatus').value = existingTask.status || 'COMPLETED';
+          document.getElementById('formSubmitBtn').innerHTML = `<span>💾</span> SAVE CHANGES`;
+        } else {
+          document.getElementById('formTaskRecordId').value = '';
+          document.getElementById('formMode').value = 'create';
+          document.getElementById('formModalTitle').textContent = 'Add Task Record';
+          document.getElementById('formPCNumber').value = pcNumber ? this.formatPCNumber(pcNumber) : '';
+          document.getElementById('formGameName').value = '';
+          document.getElementById('formTaskId').value = '';
+          document.getElementById('formChunkId').value = '';
+          document.getElementById('formPayment').value = '';
+          document.getElementById('formPaymentDone').checked = false;
+          document.getElementById('formWorkHours').value = '';
+          this.updateManualTimePreview();
+          document.getElementById('formNotes').value = '';
+          document.getElementById('formStatus').value = 'COMPLETED';
+          document.getElementById('formSubmitBtn').innerHTML = `<span>💾</span> SAVE TASK`;
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => document.getElementById('formPCNumber').focus(), 50);
+      }
+
+      closeTaskFormModal() {
+        const modal = document.getElementById('modalTaskForm');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      async handleTaskFormSubmit(e) {
+        e.preventDefault();
+        const mode = document.getElementById('formMode').value;
+        const recordId = document.getElementById('formTaskRecordId').value;
+        const pcNumber = this.formatPCNumber(document.getElementById('formPCNumber').value);
+        const gameName = String(document.getElementById('formGameName')?.value || '').trim();
+        const taskId = String(document.getElementById('formTaskId')?.value || '').trim();
+        const chunkId = String(document.getElementById('formChunkId')?.value || '').trim();
+        const paymentRaw = String(document.getElementById('formPayment')?.value || '').trim();
+        const payment = paymentRaw === '' ? 0 : parseFloat(paymentRaw) || 0;
+        const paymentDone = Boolean(document.getElementById('formPaymentDone')?.checked);
+        const hoursRaw = String(document.getElementById('formWorkHours')?.value || '').trim();
+        const hoursVal = hoursRaw === '' ? 0 : parseFloat(hoursRaw) || 0;
+        const durationMs = Math.max(0, Math.round(hoursVal * 3600 * 1000));
+        const notes = String(document.getElementById('formNotes')?.value || '').trim();
+        const status = document.getElementById('formStatus').value;
+
+        if (mode === 'create') {
+          const now = Date.now();
+          const newTask = {
+            id: this.makeUniqueTaskId(this.selectedDate),
+            date: this.selectedDate,
+            pcNumber,
+            gameName,
+            taskId,
+            chunkId,
+            status,
+            startTimestamp: durationMs > 0 ? now - durationMs : now,
+            lastResumeTimestamp: null,
+            pauseTimestamp: null,
+            endTimestamp: now,
+            accumulatedDuration: durationMs,
+            isRunning: false,
+            isPaused: false,
+            payment,
+            paymentDone,
+            notes,
+            createdAt: now,
+            updatedAt: now
+          };
+          await this.saveTaskAndSync(newTask);
+          this.showToast(`Added task on PC ${pcNumber} (${StopwatchEngine.formatHumanDuration(durationMs)})`);
+        } else {
+          const existing = this.allTasks.find(t => t.id === recordId) || (await this.db.getTask(recordId));
+          if (existing) {
+            existing.pcNumber = pcNumber;
+            existing.gameName = gameName;
+            existing.taskId = taskId;
+            existing.chunkId = chunkId;
+            existing.payment = payment;
+            existing.paymentDone = paymentDone;
+            if (hoursRaw !== '') {
+              existing.accumulatedDuration = durationMs;
+              if (durationMs > 0 && (!existing.startTimestamp || existing.startTimestamp === existing.endTimestamp)) {
+                existing.endTimestamp = Date.now();
+                existing.startTimestamp = existing.endTimestamp - durationMs;
+              } else if (existing.startTimestamp && durationMs > 0) {
+                existing.endTimestamp = existing.startTimestamp + durationMs;
+              }
+            }
+            existing.notes = notes;
+            existing.status = status;
+            await this.saveTaskAndSync(existing);
+            this.showToast(`Updated PC ${pcNumber}`);
+          }
+        }
+
+        this.closeTaskFormModal();
+        this.renderAll();
+      }
+
+      // ---- Timer Actions: Pause, Resume, Stop ----
+      async pauseTaskTimer(taskId) {
+        const task = this.allTasks.find(t => t.id === taskId);
+        if (!task || !task.isRunning || task.isPaused) return;
+
+        const now = Date.now();
+        task.accumulatedDuration = StopwatchEngine.getElapsedMs(task);
+        task.pauseTimestamp = now;
+        task.lastResumeTimestamp = null;
+        task.isPaused = true;
+
+        await this.saveTaskAndSync(task);
+        this.renderAll();
+        this.showToast('Stopwatch paused');
+      }
+
+      async resumeTaskTimer(taskId) {
+        const task = this.allTasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const running = this.getCurrentlyRunningTask();
+        if (running && running.id !== task.id) {
+          const runningLabel = running.pcNumber ? `PC ${this.formatPCNumber(running.pcNumber)}` : 'Current Task Timer';
+          this.showConfirmModal(
+            `${runningLabel} is currently running.`,
+            `Do you want to stop ${runningLabel} and resume this task timer?`,
+            'Stop Current & Resume',
+            async () => {
+              await this.silentStopRunningTask(running);
+              await this.executeResumeTask(task);
+            }
+          );
+          return;
+        }
+
+        await this.executeResumeTask(task);
+      }
+
+      async executeResumeTask(task) {
+        const now = Date.now();
+        if (!task.startTimestamp) task.startTimestamp = now;
+        task.lastResumeTimestamp = now;
+        task.pauseTimestamp = null;
+        task.isRunning = true;
+        task.isPaused = false;
+        task.status = 'IN_PROGRESS';
+
+        await this.saveTaskAndSync(task);
+        this.renderAll();
+        this.showToast('Stopwatch resumed');
+      }
+
+      async silentStopRunningTask(task) {
+        const now = Date.now();
+        task.accumulatedDuration = StopwatchEngine.getElapsedMs(task);
+        task.endTimestamp = now;
+        task.lastResumeTimestamp = null;
+        task.pauseTimestamp = null;
+        task.isRunning = false;
+        task.isPaused = false;
+        if (!task.pcNumber) task.pcNumber = '01';
+        if (!task.gameName) task.gameName = 'Unfinished Session';
+        if (!task.taskId) task.taskId = 'SESS-PENDING';
+        if (!task.chunkId) task.chunkId = 'TASK-01';
+        await this.saveTaskAndSync(task);
+      }
+
+      async stopTaskTimerPrompt(taskId) {
+        const task = this.allTasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const now = Date.now();
+        task.accumulatedDuration = StopwatchEngine.getElapsedMs(task);
+        task.endTimestamp = now;
+        task.lastResumeTimestamp = null;
+        task.pauseTimestamp = null;
+        task.isRunning = false;
+        task.isPaused = false;
+
+        await this.saveTaskAndSync(task);
+        this.renderAll();
+
+        // Open Post-Stop Modal to enter PC Number, Game Name, Session ID, Task ID, Optional Note & Payment
+        this.stoppingTaskId = task.id;
+
+        document.getElementById('stopModalStart').textContent = StopwatchEngine.formatClockTime(task.startTimestamp);
+        document.getElementById('stopModalEnd').textContent = StopwatchEngine.formatClockTime(task.endTimestamp);
+        document.getElementById('stopModalDuration').textContent = StopwatchEngine.formatHumanDuration(task.accumulatedDuration);
+
+        const existingPC = task.pcNumber ? this.formatPCNumber(task.pcNumber) : '';
+        document.getElementById('stopModalPCInput').value = existingPC;
+        document.getElementById('stopModalPCQuickSelect').value = existingPC;
+        document.getElementById('stopModalGameInput').value = task.gameName || '';
+        document.getElementById('stopModalTaskIdInput').value = task.taskId || '';
+        document.getElementById('stopModalChunkIdInput').value = task.chunkId || '';
+        document.getElementById('stopModalNotesInput').value = task.notes || '';
+        document.getElementById('stopModalPaymentDone').checked = Boolean(task.paymentDone);
+        document.getElementById('stopModalPaymentInput').value = task.payment ? task.payment : '';
+        document.getElementById('stopModalValidationMsg').classList.add('hidden');
+
+        this.renderStopModalRecentGameChips();
+
+        const modal = document.getElementById('modalStopPrompt');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        setTimeout(() => {
+          if (!existingPC) {
+            document.getElementById('stopModalPCInput').focus();
+          } else if (!task.gameName) {
+            document.getElementById('stopModalGameInput').focus();
+          }
+        }, 60);
+      }
+
+      renderStopModalRecentGameChips() {
+        const container = document.getElementById('stopModalRecentGameChips');
+        if (!container) return;
+        const recentGames = [...new Set(this.allTasks.map(t => t.gameName).filter(Boolean))].slice(0, 6);
+        if (recentGames.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+        container.innerHTML = `<span class="text-[10px] text-slate-500 mr-1">Recent:</span>` + recentGames.map(g => `
+          <button type="button" onclick="document.getElementById('stopModalGameInput').value='${this.escapeHTML(g)}'" class="text-[11px] px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition">
+            ${this.escapeHTML(g)}
+          </button>
+        `).join('');
+      }
+
+      async resumeFromStopModal() {
+        if (!this.stoppingTaskId) return;
+        const taskId = this.stoppingTaskId;
+        this.stoppingTaskId = null;
+        const modal = document.getElementById('modalStopPrompt');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        await this.resumeTaskTimer(taskId);
+      }
+
+      async discardStoppedTimer() {
+        if (!this.stoppingTaskId) return;
+        const taskId = this.stoppingTaskId;
+        this.stoppingTaskId = null;
+        const modal = document.getElementById('modalStopPrompt');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        await this.deleteTaskAndSync(taskId);
+        this.renderAll();
+        this.showToast('Discarded work session');
+      }
+
+      async finalizeStopStatus(newStatus) {
+        if (!this.stoppingTaskId) return;
+        const task = this.allTasks.find(t => t.id === this.stoppingTaskId);
+        if (!task) return;
+
+        const rawPC = document.getElementById('stopModalPCInput').value.trim();
+        const gameName = document.getElementById('stopModalGameInput').value.trim();
+        const taskId = document.getElementById('stopModalTaskIdInput').value.trim();
+        const chunkId = document.getElementById('stopModalChunkIdInput').value.trim();
+        const notes = document.getElementById('stopModalNotesInput').value.trim();
+        const paymentDone = document.getElementById('stopModalPaymentDone').checked;
+        const payVal = document.getElementById('stopModalPaymentInput').value.trim();
+
+        const validationEl = document.getElementById('stopModalValidationMsg');
+        if (!rawPC || !gameName || !taskId || !chunkId) {
+          validationEl.textContent = 'Please enter PC Number, Game Name, Session ID, and Task ID before saving.';
+          validationEl.classList.remove('hidden');
+          if (!rawPC) document.getElementById('stopModalPCInput').focus();
+          else if (!gameName) document.getElementById('stopModalGameInput').focus();
+          else if (!taskId) document.getElementById('stopModalTaskIdInput').focus();
+          else document.getElementById('stopModalChunkIdInput').focus();
+          return;
+        }
+
+        const formattedPC = this.formatPCNumber(rawPC);
+        task.pcNumber = formattedPC;
+        task.gameName = gameName;
+        task.taskId = taskId;
+        task.chunkId = chunkId;
+        task.status = newStatus;
+        task.paymentDone = paymentDone;
+        task.payment = payVal === '' ? 0 : parseFloat(payVal) || 0;
+        task.notes = notes;
+        task.isRunning = false;
+        task.isPaused = false;
+
+        await this.saveTaskAndSync(task);
+
+        this.stoppingTaskId = null;
+        const modal = document.getElementById('modalStopPrompt');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        this.renderAll();
+        this.showToast(`Logged PC ${formattedPC} • ${gameName} (${taskId})`);
+      }
+
+      // ---- Task Details Modal ----
+      openTaskDetailsModal(taskId) {
+        const task = this.allTasks.find(t => t.id === taskId);
+        if (!task) return;
+        this.activeDetailTaskId = task.id;
+
+        document.getElementById('detailPCBadge').textContent = task.pcNumber ? `PC ${this.formatPCNumber(task.pcNumber)}` : 'UNASSIGNED PC';
+        document.getElementById('detailDateBadge').textContent = task.date;
+        document.getElementById('detailGameName').textContent = task.gameName || 'Unassigned Game';
+        document.getElementById('detailStatusBadge').innerHTML = this.getStatusBadgeHTML(task.status, task.isPaused, task.isRunning);
+        document.getElementById('detailTaskId').textContent = task.taskId || '—';
+        document.getElementById('detailChunkId').textContent = task.chunkId || '—';
+        document.getElementById('detailPayment').textContent = this.formatCurrency(task.payment);
+        document.getElementById('detailStarted').textContent = StopwatchEngine.formatClockTime(task.startTimestamp);
+        document.getElementById('detailFinished').textContent = StopwatchEngine.formatClockTime(task.endTimestamp);
+        document.getElementById('detailWorkTime').textContent = StopwatchEngine.formatHumanDuration(StopwatchEngine.getElapsedMs(task));
+        document.getElementById('detailNotes').textContent = task.notes ? task.notes : 'No notes recorded.';
+
+        const payBtn = document.getElementById('detailPaymentToggleBtn');
+        const isPaid = Boolean(task.paymentDone);
+        payBtn.textContent = isPaid ? '☑ PAYMENT DONE' : '☐ UNPAID (MARK DONE)';
+        payBtn.className = `px-3.5 py-2 rounded-lg text-xs font-mono font-bold border transition ${
+          isPaid
+            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-emerald-500/40'
+        }`;
+
+        const restartBtn = document.getElementById('detailRestartTimerBtn');
+        if (task.isRunning && !task.isPaused) {
+          restartBtn.textContent = '⏸ PAUSE TIMER';
+        } else {
+          restartBtn.textContent = '▶ RESUME / RESTART TIMER';
+        }
+
+        const modal = document.getElementById('modalTaskDetails');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      async togglePaymentFromDetails() {
+        if (!this.activeDetailTaskId) return;
+        await this.toggleTaskPaymentDone(this.activeDetailTaskId);
+        if (this.activeDetailTaskId) {
+          this.openTaskDetailsModal(this.activeDetailTaskId);
+        }
+      }
+
+      closeTaskDetailsModal() {
+        const modal = document.getElementById('modalTaskDetails');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        this.activeDetailTaskId = null;
+      }
+
+      async quickChangeDetailStatus(status) {
+        if (!this.activeDetailTaskId) return;
+        const task = this.allTasks.find(t => t.id === this.activeDetailTaskId);
+        if (!task) return;
+
+        task.status = status;
+        if (status === 'COMPLETED' && task.isRunning) {
+          await this.silentStopRunningTask(task);
+        }
+        await this.saveTaskAndSync(task);
+        this.openTaskDetailsModal(task.id);
+        this.renderAll();
+        this.showToast(`Status updated to ${status.replace('_', ' ')}`);
+      }
+
+      openEditFromDetails() {
+        const task = this.allTasks.find(t => t.id === this.activeDetailTaskId);
+        if (!task) return;
+        this.closeTaskDetailsModal();
+        this.activeDetailTaskId = task.id;
+        this.showStartModalUI(task.pcNumber, task);
+      }
+
+      async restartTimerFromDetails() {
+        const task = this.allTasks.find(t => t.id === this.activeDetailTaskId);
+        if (!task) return;
+        const id = task.id;
+        this.closeTaskDetailsModal();
+        if (task.isRunning && !task.isPaused) {
+          await this.pauseTaskTimer(id);
+        } else {
+          await this.resumeTaskTimer(id);
+        }
+      }
+
+      deleteTaskFromDetails() {
+        const task = this.allTasks.find(t => t.id === this.activeDetailTaskId);
+        if (!task) return;
+        this.showConfirmModal(
+          `Delete PC ${this.formatPCNumber(task.pcNumber)} Task?`,
+          `Are you sure you want to permanently delete "${task.gameName} (${task.taskId})" from ${task.date}?`,
+          'Delete Task',
+          async () => {
+            await this.deleteTaskAndSync(task.id);
+            this.closeTaskDetailsModal();
+            this.renderAll();
+            this.showToast('Task deleted');
+          }
+        );
+      }
+
+      // ---- History View Rendering ----
+      renderHistory() {
+        const query = (document.getElementById('historySearchInput')?.value || '').trim().toLowerCase();
+        const paymentFilter = document.getElementById('historyPaymentFilter')?.value || 'ALL';
+        const statusFilter = document.getElementById('historyStatusFilter')?.value || 'ALL';
+        const timeFilter = document.getElementById('historyTimeFilter')?.value || 'ALL';
+
+        const todayISO = this.getTodayISO();
+        const currentWeekDates = new Set(this.getWeekDates(this.selectedDate));
+        const mondayOfCurrentWeek = this.getWeekDates(this.selectedDate)[0];
+
+        let filtered = this.allTasks.filter(t => {
+          if (t.isRunning && !t.gameName) return false;
+          if (paymentFilter === 'PAID' && !t.paymentDone) return false;
+          if (paymentFilter === 'UNPAID' && t.paymentDone) return false;
+          if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
+          if (timeFilter === 'TODAY' && t.date !== todayISO) return false;
+          if (timeFilter === 'THIS_WEEK' && !currentWeekDates.has(t.date)) return false;
+          if (timeFilter === 'PREVIOUS_WEEKS' && t.date >= mondayOfCurrentWeek) return false;
+
+          if (query) {
+            const pcStr = `pc ${this.formatPCNumber(t.pcNumber)} pc${this.formatPCNumber(t.pcNumber)}`;
+            const hay = `${t.date} ${pcStr} ${t.gameName || ''} ${t.taskId || ''} ${t.chunkId || ''} ${t.notes || ''}`.toLowerCase();
+            if (!hay.includes(query)) return false;
+          }
+          return true;
+        });
+
+        // Sort newest date & timestamp first
+        filtered.sort((a, b) => {
+          if (a.date !== b.date) return b.date.localeCompare(a.date);
+          return (b.startTimestamp || 0) - (a.startTimestamp || 0);
+        });
+
+        document.getElementById('historyResultCount').textContent = `${filtered.length} Task${filtered.length === 1 ? '' : 's'}`;
+        const container = document.getElementById('historyListContainer');
+
+        if (filtered.length === 0) {
+          container.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">No matching task records found in History.</div>`;
+          return;
+        }
+
+        container.innerHTML = filtered.map(t => this.buildTaskRowHTML(t, true)).join('');
+      }
+
+      // ---- Weekly Summary Rendering ----
+      renderWeeklySummary() {
+        const weekDates = this.getWeekDates(this.selectedDate);
+        const startObj = this.parseISODate(weekDates[0]);
+        const endObj = this.parseISODate(weekDates[6]);
+        const fmt = d => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
+        document.getElementById('summaryWeekLabel').textContent = `${fmt(startObj)} – ${fmt(endObj)} ${endObj.getFullYear()}`;
+
+        const weekTasks = this.allTasks.filter(t => weekDates.includes(t.date) && (!t.isRunning || t.gameName));
+        const totalTasks = weekTasks.length;
+        const totalMs = weekTasks.reduce((a, t) => a + StopwatchEngine.getElapsedMs(t), 0);
+        const totalPay = weekTasks.reduce((a, t) => a + (Number(t.payment) || 0), 0);
+        const paidCount = weekTasks.filter(t => Boolean(t.paymentDone)).length;
+        const completed = weekTasks.filter(t => t.status === 'COMPLETED').length;
+        const inProgress = weekTasks.filter(t => t.status === 'IN_PROGRESS').length;
+        const blocked = weekTasks.filter(t => t.status === 'BLOCKED').length;
+
+        document.getElementById('sumTotalTasks').textContent = totalTasks;
+        document.getElementById('sumTotalTime').textContent = StopwatchEngine.formatSummaryHoursMinutes(totalMs);
+        document.getElementById('sumTotalPayment').textContent = this.formatCurrency(totalPay);
+        document.getElementById('sumPaidStatus').textContent = `${paidCount} / ${totalTasks}`;
+        document.getElementById('sumCompleted').textContent = completed;
+        document.getElementById('sumInProgressBlocked').textContent = `${inProgress} / ${blocked}`;
+
+        const dayLabels = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+        const rowsContainer = document.getElementById('summaryDaysContainer');
+
+        rowsContainer.innerHTML = weekDates.map((iso, idx) => {
+          const dTasks = weekTasks.filter(t => t.date === iso);
+          const dMs = dTasks.reduce((a, t) => a + StopwatchEngine.getElapsedMs(t), 0);
+          const dPay = dTasks.reduce((a, t) => a + (Number(t.payment) || 0), 0);
+          const dPaid = dTasks.filter(t => Boolean(t.paymentDone)).length;
+          const dComp = dTasks.filter(t => t.status === 'COMPLETED').length;
+          const dObj = this.parseISODate(iso);
+          const dateShort = dObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+          const dAtt = this.getDayAttendanceSummary(iso);
+          const attBadge = dAtt.logs.length > 0
+            ? `<span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300">🏢 ${StopwatchEngine.formatClockTime(dAtt.firstJoin)} – ${dAtt.isInOffice ? 'Active' : StopwatchEngine.formatClockTime(dAtt.lastLeave)}</span>`
+            : '';
+
+          return `
+            <div onclick="app.selectDate('${iso}')" class="p-3.5 sm:px-5 hover:bg-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 cursor-pointer transition">
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="w-24 font-mono text-xs font-bold text-sky-400">${dayLabels[idx].slice(0, 3)} ${dateShort}</div>
+                <div class="flex items-center gap-2 text-xs flex-wrap">
+                  <span class="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-slate-200">Tasks: <b>${dTasks.length}</b></span>
+                  ${dComp > 0 ? `<span class="text-emerald-400 font-mono text-xs">🟢 ${dComp}</span>` : ''}
+                  ${dTasks.length > 0 ? `<span class="text-emerald-300 font-mono text-xs">☑ Paid: ${dPaid}/${dTasks.length}</span>` : ''}
+                  ${attBadge}
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between sm:justify-end gap-6 font-mono text-xs sm:text-sm">
+                <div>
+                  <span class="text-slate-500 text-xs mr-1">Time:</span>
+                  <span class="font-bold text-sky-400">${StopwatchEngine.formatSummaryHoursMinutes(dMs)}</span>
+                </div>
+                <div class="min-w-[90px] text-right">
+                  <span class="text-slate-500 text-xs mr-1">Pay:</span>
+                  <span class="font-bold text-emerald-300">${this.formatCurrency(dPay)}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // ---- Backup, Import, CSV & Safety Controls ----
+      exportJSONBackup() {
+        const payload = {
+          app: 'QA-Office-Task-Tracker',
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          taskCount: this.allTasks.length,
+          tasks: this.allTasks,
+          attendanceLogs: this.attendanceLogs
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        this.triggerDownload(blob, `qa-tracker-backup-${this.getTodayISO()}.json`);
+        this.showToast('Backup JSON downloaded');
+      }
+
+      async importJSONBackup(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          const tasksArray = Array.isArray(data) ? data : (data.tasks || []);
+          const attArray = Array.isArray(data.attendanceLogs) ? data.attendanceLogs : [];
+          if (!Array.isArray(tasksArray)) {
+            this.showToast('Invalid backup file format', true);
+            return;
+          }
+          this.showConfirmModal(
+            'Import Backup Data?',
+            `Found ${tasksArray.length} task(s)${attArray.length ? ` and ${attArray.length} attendance log(s)` : ''} in backup file. Importing will merge/update your local & cloud database.`,
+            'Import Now',
+            async () => {
+              await this.db.importBulkTasks(tasksArray, true);
+              if (attArray.length > 0) {
+                const map = new Map(this.attendanceLogs.map(a => [a.id, a]));
+                attArray.forEach(a => {
+                  if (a && a.id) {
+                    this.db.unmarkIdAsDeleted(a.id);
+                    map.set(a.id, a);
+                  }
+                });
+                this.attendanceLogs = Array.from(map.values());
+                this.saveAttendanceLogsLocal();
+              }
+              await this.reloadTasksFromDB();
+              this.renderAll();
+              await this.pushCloudSnapshot();
+              this.showToast(`Imported & synced ${tasksArray.length} tasks`);
+            }
+          );
+        } catch (err) {
+          console.error(err);
+          this.showToast('Failed to parse JSON file', true);
+        } finally {
+          event.target.value = '';
+        }
+      }
+
+      parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              current += '"';
+              i++;
+            } else {
+              inQuotes = !inQuotes;
+            }
+          } else if (ch === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+        result.push(current);
+        return result;
+      }
+
+      async importCSVBackup(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+          if (lines.length < 2) {
+            this.showToast('CSV file has no task rows', true);
+            return;
+          }
+          const headers = this.parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+          const col = (names) => {
+            for (const n of names) {
+              const idx = headers.indexOf(n);
+              if (idx >= 0) return idx;
+            }
+            return -1;
+          };
+
+          const iDate = col(['date']);
+          const iPC = col(['pcnumber', 'pc number', 'pc']);
+          const iGame = col(['gamename', 'game name', 'game']);
+          const iSess = col(['sessionid', 'session id', 'taskid', 'task id']);
+          const iTask = col(['chunkid', 'chunk id', 'taskid', 'task id']);
+          const iPaid = col(['paymentdone', 'payment done', 'paid']);
+          const iPay = col(['paymentbdt', 'payment', 'amount']);
+          const iStatus = col(['status']);
+          const iSecs = col(['worktimeseconds', 'seconds']);
+          const iStart = col(['started', 'start']);
+          const iEnd = col(['finished', 'end']);
+          const iNotes = col(['notes', 'note']);
+
+          const imported = [];
+          const now = Date.now();
+
+          for (let r = 1; r < lines.length; r++) {
+            const cells = this.parseCSVLine(lines[r]);
+            const date = iDate >= 0 ? (cells[iDate] || '').trim() : this.getTodayISO();
+            if (!date) continue;
+
+            const pcNumber = iPC >= 0 ? this.formatPCNumber(cells[iPC]) : '01';
+            const gameName = iGame >= 0 ? (cells[iGame] || '').trim() : '';
+            // If CSV has both SessionID and TaskID, map directly; if old CSV has TaskID and ChunkID, map TaskID->taskId(SessionID), ChunkID->chunkId(TaskID)
+            let sessionVal = '';
+            let taskVal = '';
+            if (headers.includes('sessionid')) {
+              sessionVal = (cells[headers.indexOf('sessionid')] || '').trim();
+              taskVal = headers.includes('taskid') ? (cells[headers.indexOf('taskid')] || '').trim() : '';
+            } else {
+              sessionVal = iSess >= 0 ? (cells[iSess] || '').trim() : '';
+              taskVal = iTask >= 0 && iTask !== iSess ? (cells[iTask] || '').trim() : '';
+            }
+
+            const paidStr = iPaid >= 0 ? (cells[iPaid] || '').trim().toUpperCase() : '';
+            const paymentDone = paidStr === 'YES' || paidStr === 'TRUE' || paidStr === '1';
+            const payment = iPay >= 0 ? parseFloat(cells[iPay]) || 0 : 0;
+            const status = iStatus >= 0 && cells[iStatus]?.trim() ? cells[iStatus].trim().toUpperCase() : 'COMPLETED';
+            const secs = iSecs >= 0 ? parseFloat(cells[iSecs]) || 0 : 0;
+            const startTs = iStart >= 0 && cells[iStart] ? Date.parse(cells[iStart]) || now : now;
+            const endTs = iEnd >= 0 && cells[iEnd] ? Date.parse(cells[iEnd]) || startTs + secs * 1000 : startTs + secs * 1000;
+            const notes = iNotes >= 0 ? (cells[iNotes] || '').trim() : '';
+
+            imported.push({
+              id: `CSV_${date.replace(/-/g, '')}_${r}_${now}`,
+              date,
+              pcNumber,
+              gameName,
+              taskId: sessionVal,
+              chunkId: taskVal,
+              status,
+              startTimestamp: startTs,
+              lastResumeTimestamp: null,
+              pauseTimestamp: null,
+              endTimestamp: endTs,
+              accumulatedDuration: Math.max(0, Math.round(secs * 1000)),
+              isRunning: false,
+              isPaused: false,
+              payment,
+              paymentDone,
+              notes,
+              createdAt: startTs,
+              updatedAt: now
+            });
+          }
+
+          if (imported.length === 0) {
+            this.showToast('No valid rows found in CSV', true);
+            return;
+          }
+
+          this.showConfirmModal(
+            'Import CSV Data?',
+            `Found ${imported.length} task(s) in CSV file. Importing will add them to your tracker and sync to the cloud.`,
+            'Import & Sync',
+            async () => {
+              await this.db.importBulkTasks(imported, true);
+              await this.reloadTasksFromDB();
+              this.renderAll();
+              await this.pushCloudSnapshot();
+              this.showToast(`Imported & synced ${imported.length} CSV tasks`);
+            }
+          );
+        } catch (err) {
+          console.error(err);
+          this.showToast('Failed to parse CSV file', true);
+        } finally {
+          event.target.value = '';
+        }
+      }
+
+      exportCSV() {
+        const headers = ['Date', 'PCNumber', 'GameName', 'SessionID', 'TaskID', 'PaymentDone', 'PaymentBDT', 'Status', 'WorkTimeSeconds', 'WorkTimeFormatted', 'Started', 'Finished', 'Notes'];
+        const rows = this.allTasks
+          .slice()
+          .sort((a, b) => a.date.localeCompare(b.date) || (a.startTimestamp || 0) - (b.startTimestamp || 0))
+          .map(t => {
+            const ms = StopwatchEngine.getElapsedMs(t);
+            const secs = Math.floor(ms / 1000);
+            const fmt = StopwatchEngine.formatHMS(ms);
+            return [
+              t.date,
+              `PC ${this.formatPCNumber(t.pcNumber)}`,
+              t.gameName,
+              t.taskId,
+              t.chunkId,
+              t.paymentDone ? 'YES' : 'NO',
+              t.payment || 0,
+              t.status,
+              secs,
+              fmt,
+              t.startTimestamp ? new Date(t.startTimestamp).toISOString() : '',
+              t.endTimestamp ? new Date(t.endTimestamp).toISOString() : '',
+              (t.notes || '').replace(/\r?\n/g, ' ')
+            ].map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',');
+          });
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        this.triggerDownload(blob, `qa-tasks-export-${this.getTodayISO()}.csv`);
+        this.showToast('CSV exported');
+      }
+
+      confirmDeleteDay() {
+        const dayTasks = this.allTasks.filter(t => t.date === this.selectedDate);
+        if (dayTasks.length === 0) {
+          this.showToast('No tasks on this day to delete');
+          return;
+        }
+        this.showConfirmModal(
+          `Clear Tasks on ${this.selectedDate}?`,
+          `This will permanently remove ${dayTasks.length} task(s) recorded for ${this.selectedDate}. Other days will not be affected.`,
+          'Clear Current Day',
+          async () => {
+            const ids = dayTasks.map(t => t.id);
+            await this.db.deleteMultipleTasks(ids);
+            await this.reloadTasksFromDB();
+            this.renderAll();
+            await this.pushCloudSnapshot();
+            this.showToast(`Cleared ${dayTasks.length} tasks from ${this.selectedDate}`);
+          }
+        );
+      }
+
+      // ---- Mobile Swipe Navigation & Helpers ----
+      setupSwipeGestures() {
+        const area = document.getElementById('daySwipeArea');
+        if (!area) return;
+        let startX = 0;
+        let startY = 0;
+        area.addEventListener('touchstart', e => {
+          startX = e.changedTouches[0].screenX;
+          startY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        area.addEventListener('touchend', e => {
+          const dx = e.changedTouches[0].screenX - startX;
+          const dy = e.changedTouches[0].screenY - startY;
+          if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            if (dx < 0) this.changeDay(1);
+            else this.changeDay(-1);
+          }
+        }, { passive: true });
+      }
+
+      updateRecentGamesAutocomplete() {
+        const games = [...new Set(this.allTasks.map(t => t.gameName).filter(Boolean))];
+        const datalist = document.getElementById('recentGamesList');
+        if (datalist) {
+          datalist.innerHTML = games.map(g => `<option value="${this.escapeHTML(g)}">`).join('');
+        }
+      }
+
+      showConfirmModal(title, message, confirmText, onConfirm) {
+        const modal = document.getElementById('modalConfirm');
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalMessage').textContent = message;
+        const acceptBtn = document.getElementById('confirmAcceptBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+        acceptBtn.textContent = confirmText;
+
+        const close = () => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        };
+
+        cancelBtn.onclick = close;
+        acceptBtn.onclick = async () => {
+          close();
+          if (onConfirm) await onConfirm();
+        };
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      showToast(msg, isError = false) {
+        const container = document.getElementById('toastContainer');
+        const el = document.createElement('div');
+        el.className = `px-3.5 py-2 rounded-xl text-xs font-bold shadow-lg border backdrop-blur-md transition-all ${
+          isError
+            ? 'bg-rose-950/90 border-rose-700 text-rose-200'
+            : 'bg-slate-900/95 border-slate-700 text-sky-300'
+        }`;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => el.remove(), 2600);
+      }
+
+      triggerDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      escapeHTML(str) {
+        return String(str ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // ---- PWA & GitHub Repository Bundle Generator ----
+      getManifestObject() {
+        return {
+          name: 'QA Office Task & PC Tracker',
+          short_name: 'QA Tracker',
+          description: 'Personal QA Testing PC 01-40 Task, Stopwatch & BDT Payment Tracker',
+          start_url: './index.html',
+          display: 'standalone',
+          background_color: '#090d16',
+          theme_color: '#090d16',
+          icons: [
+            {
+              src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230f172a'/%3E%3Ctext x='50%25' y='56%25' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-family='monospace' font-weight='bold' font-size='76'%3EQA%3C/text%3E%3C/svg%3E",
+              sizes: '192x192',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
+            },
+            {
+              src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f172a'/%3E%3Ctext x='50%25' y='56%25' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-family='monospace' font-weight='bold' font-size='200'%3EQA%3C/text%3E%3C/svg%3E",
+              sizes: '512x512',
+              type: 'image/svg+xml',
+              purpose: 'any maskable'
+            }
+          ]
+        };
+      }
+
+      setupPWA() {
+        try {
+          const manifestBlob = new Blob([JSON.stringify(this.getManifestObject())], { type: 'application/manifest+json' });
+          const link = document.createElement('link');
+          link.rel = 'manifest';
+          link.href = URL.createObjectURL(manifestBlob);
+          document.head.appendChild(link);
+
+          if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+            navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      downloadProjectFile(filename) {
+        let content = '';
+        let mime = 'text/plain;charset=utf-8';
+
+        if (filename === 'index.html' || filename.endsWith('.html')) {
+          content = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+          mime = 'text/html;charset=utf-8';
+        } else if (filename === 'manifest.json') {
+          content = JSON.stringify(this.getManifestObject(), null, 2);
+          mime = 'application/json;charset=utf-8';
+        } else if (filename === 'service-worker.js') {
+          content = `const CACHE_NAME = 'qa-tracker-v1';
+const ASSETS = ['./', './index.html', './manifest.json'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
+  );
+});
+`;
+          mime = 'application/javascript;charset=utf-8';
+        } else if (filename === '.gitignore') {
+          content = `.DS_Store\nThumbs.db\n.vscode/\n.idea/\nnode_modules/\n*.log\n`;
+        } else if (filename === 'README.md') {
+          content = `# QA Office Task & PC Tracker (PC 01–40)\n\nPersonal office work, stopwatch, PC 01–40 slot tracker, and BDT (৳) payment tracker built with plain HTML, Tailwind CSS, JavaScript, and IndexedDB.\n\n## Features\n- Automatic daily **PC 01–40** board\n- Accurate timestamp-based stopwatch (survives tab sleep, phone screen lock, and page refresh)\n- Single active timer enforcement\n- Week & Day navigation with Weekly BDT (৳) Payment Summary\n- Searchable History & CSV / JSON Backup & Restore\n- Installable PWA support\n`;
+        }
+
+        const blob = new Blob([content], { type: mime });
+        this.triggerDownload(blob, filename);
+        this.showToast(`Downloaded ${filename}`);
+      }
+    }
+
+    const app = new QATrackerApp();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => app.init());
+    } else {
+      app.init();
+    }
+  </script>
+</body>
+</html>
